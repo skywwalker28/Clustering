@@ -16,10 +16,8 @@ public class OptimizationResponse {
         try {
             System.out.println("Parsing response from APi...");
 
-            ObjectMapper mapper = new ObjectMapper();
             JsonNode root = new ObjectMapper().readTree(response);
             JsonNode routes = root.path("routes");
-
 
            if (!routes.isArray()) {
                System.out.println("Response does not contain 'routes' array");

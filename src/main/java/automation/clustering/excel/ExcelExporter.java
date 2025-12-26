@@ -1,84 +1,133 @@
 package automation.clustering.excel;
 
+import automation.clustering.distance.RouteDistance;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
 public class ExcelExporter {
-    public static void exportToExcel(Map<Integer, List<double[]>> driverRoutes, String filePath) throws Exception  {
-        System.out.println("\nCreating Excel report: " + filePath);
 
+    public static void exportToExcelSingleSheet(Map<Integer, List<double[]>> driverRoutes,
+                                                Map<Integer, List<String>> driverAddresses,
+                                                String filepath) throws Exception {
         Workbook workbook = new XSSFWorkbook();
 
-        CellStyle headerStyle = createHeaderStyle(workbook);
-        CellStyle driverStyle = createDriverStyle(workbook);
-        CellStyle distanceStyle =createDistanceStyle(workbook);
-        CellStyle coordinateStyle = createCoordinateStyle(workbook);
+        CellStyle headerStyle = Styles.createHeaderStyle(workbook);
+        CellStyle driverHeaderStyle = Styles.createDriverStyle(workbook);
+        CellStyle addressStyle = Styles.createAddressStyleStyle(workbook);
+        CellStyle distanceStyle = Styles.createDistanceStyle(workbook);
+        CellStyle timeStyle = Styles.createTimeStyle(workbook);
 
-        Sheets.createSummarySheet(workbook, driverRoutes, headerStyle, driverStyle);
+        Sheet sheet = workbook.createSheet("Delivery Routes");
+
+        int currentRow = 0;
 
         for (Map.Entry<Integer, List<double[]>> entry : driverRoutes.entrySet()) {
             int driverId = entry.getKey();
+            int driverNumber = driverId + 1;
             List<double[]> points = entry.getValue();
+            List<String> addresses = driverAddresses.get(driverId);
 
-            if (!points.isEmpty()) {
-                Sheets.createDriverSheet(workbook, driverId, points, headerStyle, distanceStyle, coordinateStyle);
+            if (points.isEmpty()) continue;
+
+            Row driverHeaderRow = sheet.createRow(currentRow++);
+            Cell driverCell = driverHeaderRow.createCell(0);
+            driverCell.setCellValue("Водитель: " + driverNumber);
+            driverCell.setCellStyle(driverHeaderStyle);
+
+            sheet.addMergedRegion(
+                    new CellRangeAddress(currentRow - 1, currentRow -1, 0, 4));
+
+            Row infoRow = sheet.createRow(currentRow++);
+
+            double totalDistance = RouteDistance.getRouteDistance(points);
+            double estimatedTime = Styles.calculateEstimatedTime(totalDistance);
+
+            infoRow.createCell(0).setCellValue("Кол-во точек:");
+            infoRow.createCell(1).setCellValue(points.size());
+            infoRow.createCell(2).setCellValue("Общая дистанция:");
+            Cell distanceCell = infoRow.createCell(3);
+            distanceCell.setCellValue(totalDistance / 1000);
+            distanceCell.setCellStyle(distanceStyle);
+            infoRow.createCell(4).setCellValue("км");
+
+            infoRow.createCell(5).setCellValue("Примерное время:");
+
+            Cell timeCell = infoRow.createCell(6);
+            timeCell.setCellValue(estimatedTime);
+            timeCell.setCellStyle(timeStyle);
+            infoRow.createCell(7).setCellValue("часов");
+
+            Row tableHeaderRow = sheet.createRow(currentRow++);
+            String[] headers = {"№", "Адрес доставки", "Дистанция участка (км)",
+                    "Накопленная дистанция (км)", "Примерное время до точки"};
+
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = tableHeaderRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
             }
+
+            double cumulativeDistance = 0;
+            double cumulativeTime = 0;
+
+            for (int i = 0; i < points.size(); i++) {
+                Row row = sheet.createRow(currentRow++);
+
+                row.createCell(0).setCellValue(i + 1);
+
+                Cell addressCell = row.createCell(1);
+                if (addresses != null && i < addresses.size()) {
+                    addressCell.setCellValue(addresses.get(i));
+                } else {
+                    addressCell.setCellValue("Адрес не указан!");
+                }
+                addressCell.setCellStyle(addressStyle);
+
+                    try {
+                        List<double[]> segment = (i != 0) ? List.of(points.get(i - 1), points.get(i))
+                                : List.of(new double[]{55.592605, 37.747183}, points.get(i));
+
+                        double segmentDistance = RouteDistance.getRouteDistance(segment);
+                        double segmentTime = Styles.calculateSegmentTime(segmentDistance);
+
+                        Cell segmentCell = row.createCell(2);
+                        segmentCell.setCellValue(segmentDistance / 1000);
+                        segmentCell.setCellStyle(distanceStyle);
+
+                        cumulativeDistance += segmentDistance;
+                        cumulativeTime += segmentTime;
+
+                        Cell cumDistCell = row.createCell(3);
+                        cumDistCell.setCellValue(cumulativeDistance / 1000);
+                        cumDistCell.setCellStyle(distanceStyle);
+
+                        Cell timeToPointCell = row.createCell(4);
+                        timeToPointCell.setCellValue(cumulativeTime);
+                        timeToPointCell.setCellStyle(timeStyle);
+                    } catch (Exception e) {
+                        row.createCell(2).setCellValue("Ошибка");
+                        row.createCell(3).setCellValue("Ошибка");
+                        row.createCell(4).setCellValue("Ошибка");
+                    }
+
+            }
+
+            currentRow++;
         }
 
-        try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
+        for (int i = 0; i < 8; i++) {
+            sheet.autoSizeColumn(i);
+        }
+
+        try (FileOutputStream fileOut = new FileOutputStream(filepath)) {
             workbook.write(fileOut);
-            System.out.println("Excel file created successfully");
-            System.out.println("Location: " + filePath);
-        } catch (IOException e) {
-            System.err.println("Error saving Excel file: " + e.getMessage());
-            throw e;
         } finally {
             workbook.close();
         }
-    }
-
-    private static CellStyle createHeaderStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        Font font = workbook.createFont();
-        font.setBold(true);
-        font.setColor(IndexedColors.WHITE.getIndex());
-        style.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        style.setAlignment(HorizontalAlignment.CENTER);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setFont(font);
-        return style;
-    }
-
-    private static CellStyle createDriverStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        Font font = workbook.createFont();
-        font.setBold(true);
-        font.setColor(IndexedColors.DARK_BLUE.getIndex());
-        style.setFont(font);
-        style.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        return style;
-    }
-
-    private static CellStyle createCoordinateStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        style.setDataFormat(workbook.createDataFormat().getFormat("0.000000"));
-        return style;
-    }
-
-    static CellStyle createDistanceStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        style.setDataFormat(workbook.createDataFormat().getFormat("0.00"));
-        Font font = workbook.createFont();
-        font.setColor(IndexedColors.DARK_GREEN.getIndex());
-        style.setFont(font);
-        return style;
     }
 }
