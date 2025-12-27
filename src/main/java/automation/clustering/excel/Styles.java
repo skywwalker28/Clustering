@@ -1,6 +1,8 @@
 package automation.clustering.excel;
 
 import org.apache.poi.ss.usermodel.*;
+import java.awt.Color;
+import org.apache.poi.xssf.usermodel.XSSFColor;
 
 public class Styles {
 
@@ -68,5 +70,11 @@ public class Styles {
         double averageSpeedKm = 40.0;
         double distanceKm = segmentDistanceMeters / 1000;
         return Math.round((distanceKm / averageSpeedKm) * 10.0) / 10.0;
+    }
+
+    public static XSSFColor createColor(String hexColor) {
+        Color awtColor = Color.decode(hexColor);
+        byte[] rgb = new byte[]{(byte) awtColor.getRed(), (byte) awtColor.getGreen(), (byte) awtColor.getBlue()};
+        return new XSSFColor(rgb, null);
     }
 }

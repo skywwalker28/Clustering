@@ -2,6 +2,8 @@ package automation.clustering.optimization;
 
 import automation.clustering.excel.ExcelExporter;
 import automation.clustering.geocoding.OpenRouteGeocoder;
+import automation.clustering.map.RouteMapExporter;
+import automation.clustering.model.DeliveryPoint;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -17,31 +19,41 @@ public class RouteOptimizationService {
     public static final String API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRlOD" +
           "I1N2ZkOGU1YzRmZjdiMjgxNTJhYWViZjFkZDY2IiwiaCI6Im11cm11cjY0In0=";
 
-    private static final int MAX_POINTS_PER_DRIVER = 7;
+    private static final int MAX_POINTS_PER_DRIVER = 10;
     private static final int MAX_VEHICLES = 5;
 
+    private static final int MAX_WEIGHT = 550;
     private static final double BMM_LAT = 55.592605;
     private static final double BMM_LON = 37.747183;
 
     public void optimizeAndDisplayRoutes() {
         try {
-            List<String> addresses = Arrays.asList(
-                    "г. Пушкино, Московский проспект 2",
-                    "Московская обл, Долгопрудный, Пацаева 12.",
-                    "г. Химки, мкр. Сходня улица Кирова 3с2",
-                    "г Москва 2-я Владимирская 38/18",
-                    "г.Зеленоград, пл. Привокзальная, д. 1, стр. 5",
-                    "г. Красногорск, м-н Опалиха, ул. Опалиха 2",
-                    "Московская область, Красногорск, Красногорский бульвар, 18",
-                    "Вокзальная улица, 20/1",
-                    "Институтская 26, Нахабино",
-                    "Московская область,Новлянская улица, 10",
-                    "г. Балашиха, мкр Железнодорожный, Проспект героев дом 5",
-                    "Бронницы, ул. Красная 26",
-                    "Московская область, г. Электросталь, г. Электросталь, ул Ялагина, д. 3",
-                    "Мкр.Железнодорожный, Балашиха, Советская улица",
-                    "улица Майора Удачина"
+
+            List<DeliveryPoint> points = List.of(
+                    new DeliveryPoint("Курский Вокзал, Земляной Вал 29, стр 1", 10),
+                    new DeliveryPoint("г. Пушкино, Московский проспект 2", 8),
+                    new DeliveryPoint("г. Химки, мкр. Сходня улица Кирова 3с2", 12),
+                    new DeliveryPoint(" МО. г. Пушкино, Московский проспект 21", 10),
+                    new DeliveryPoint("Авиамоторная 20/17", 16),
+                    new DeliveryPoint(" г. Москва, ул. Волгоградский проспект 117 к3", 2),
+                    new DeliveryPoint(" г. Химки, мкр. Сходня ул, Кирова 3с2", 6),
+                    new DeliveryPoint("г. Москва, ул. Люблинская д.4 к.2", 40),
+                    new DeliveryPoint("г. Москва, ул. Авиамоторная д.14", 40),
+                    new DeliveryPoint("г. Москва, ул. Люблинская д.4 к.2", 40),
+                    new DeliveryPoint("г. Москва, ул. Вавилова 6", 40),
+                    new DeliveryPoint(" г. Москва, Менжинского 21 пом 9/1", 40),
+                    new DeliveryPoint(" г. Москва, ул. Профсоюзная д. 128 к2", 40),
+                    new DeliveryPoint("МО Вокзальная 20/1, жд ст Павшино", 50)
             );
+
+            List<String> addresses = points.stream()
+                    .map(DeliveryPoint::getAddress)
+                    .toList();
+
+            List<Integer> weights = points.stream()
+                    .map(DeliveryPoint::getWeightKg)
+                    .toList();
+
 
             List<double[]> coordinates = OpenRouteGeocoder.geocodingAddresses(addresses);
             if (coordinates.isEmpty()) {
@@ -55,16 +67,41 @@ public class RouteOptimizationService {
                 parseCoordinates[i][1] = coordinates.get(i)[1];
             }
 
-            String requestJson = buildORSOptimizationJson(coordinates);
-
+            String requestJson = buildORSOptimizationJson(coordinates, weights);
             String response = sendORSRequest(requestJson);
 
             Map<Integer, List<double[]>> routes =
                     OptimizationResponse.parseOptimizationResponse(response, parseCoordinates);
 
+            Map<Integer, List<Integer>> driverWeights = new HashMap<>();
+            for (Map.Entry<Integer, List<double[]>> entry : routes.entrySet()) {
+                int driverId = entry.getKey();
+                List<double[]> routePoints = entry.getValue();
+                List<Integer> weightsForDriver = new ArrayList<>();
+
+                for (double[] point : routePoints) {
+                    int index = -1;
+                    for (int i = 0; i < coordinates.size(); i++) {
+                        if (coordinates.get(i)[0] == point[0] && coordinates.get(i)[1] == point[1]) {
+                            index = i;
+                            break;
+                        }
+                    }
+                    if (index != -1) {
+                        weightsForDriver.add(weights.get(index));
+                    } else {
+                        weightsForDriver.add(0);
+                    }
+                }
+
+                driverWeights.put(driverId, weightsForDriver);
+            }
+
             Map<Integer, List<String>> driverAddresses = mapAddressesToRoutes(routes, addresses, coordinates);
+            RouteMapExporter.exportHtmlMap(routes, driverAddresses, "routes_map.html");
 
             System.out.println("Всего требуется водителей: " + routes.size());
+
             int totalPoints = 0;
             for (Map.Entry<Integer, List<double[]>> entry : routes.entrySet()) {
                 int driverNum = entry.getKey() + 1;
@@ -79,9 +116,9 @@ public class RouteOptimizationService {
             System.out.println("\nВсего распределенно точек: " + totalPoints + "/" + coordinates.size());
 
             String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-            String fileName = "optimized_routes_" + timestamp + ".xlsx";
-            ExcelExporter.exportToExcelSingleSheet(routes, driverAddresses, fileName);
-            System.out.println("\n✅ Excel report created: " + fileName);
+
+            ExcelExporter.exportToExcelSingleSheet(routes, driverAddresses, driverWeights,
+                    "optimized_routes_" + timestamp + ".xlsx");
 
         } catch (Exception e) {
             System.err.println("Error in RouteOptimizationService: " + e.getMessage());
@@ -89,22 +126,46 @@ public class RouteOptimizationService {
         }
     }
 
-    private String buildORSOptimizationJson(List<double[]> coordinates) {
-        int neededVehicles = Math.min(coordinates.size() / MAX_POINTS_PER_DRIVER + 1, MAX_VEHICLES);
+    private String buildORSOptimizationJson(List<double[]> coordinates, List<Integer> weights) {
+        int neededVehicles =
+                Math.min((int) Math.ceil((double) coordinates.size() / MAX_POINTS_PER_DRIVER), MAX_VEHICLES);
 
         StringBuilder jobs = new StringBuilder();
         for (int i = 0; i < coordinates.size(); i++) {
-            double[] coord = coordinates.get(i);
-            jobs.append("{\"id\":").append(i)
-                    .append(",\"location\":[").append(coord[1]).append(",").append(coord[0]).append("]}");
+           double[] c = coordinates.get(i);
+           int weight = weights.get(i);
+
+            jobs.append("""
+                {
+                  "id": %d,
+                  "location": [%f, %f],
+                  "amount": [%d, 1]
+                }
+                """.formatted(
+                    i,
+                    c[1], c[0],
+                    weight
+            ));
+
             if (i < coordinates.size() - 1) jobs.append(",");
         }
 
         StringBuilder vehicles = new StringBuilder();
         for (int i = 0; i < neededVehicles; i++) {
-            vehicles.append("{\"id\":").append(i)
-                    .append(",\"start\":[").append(BMM_LON).append(",").append(BMM_LAT).append("],")
-                    .append("\"profile\":\"driving-car\"}");
+            vehicles.append("""
+                {
+                  "id": %d,
+                  "start": [%f, %f],
+                  "capacity": [%d, %d],
+                  "profile": "driving-car"
+                }
+                """.formatted(
+                    i,
+                    BMM_LON, BMM_LAT,
+                    MAX_WEIGHT,
+                    MAX_POINTS_PER_DRIVER
+            ));
+
             if (i < neededVehicles - 1) vehicles.append(",");
         }
 
@@ -113,7 +174,7 @@ public class RouteOptimizationService {
           "jobs": [%s],
           "vehicles": [%s]
         }
-        """.formatted(jobs.toString(), vehicles.toString());
+        """.formatted(jobs, vehicles);
     }
 
 
