@@ -1,31 +1,21 @@
 package automation.clustering.optimization;
 
+import automation.clustering.json.BuildORS;
 import automation.clustering.excel.ExcelExporter;
 import automation.clustering.excel.ExcelReader;
 import automation.clustering.geocoding.OpenRouteGeocoder;
 import automation.clustering.map.RouteMapExporter;
 import automation.clustering.model.DeliveryPoint;
 import org.springframework.stereotype.Service;
-
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import static automation.clustering.json.BuildORS.sendORSRequest;
 
 @Service
 public class RouteOptimizationService {
 
     public static final String API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRlOD" +
           "I1N2ZkOGU1YzRmZjdiMjgxNTJhYWViZjFkZDY2IiwiaCI6Im11cm11cjY0In0=";
-
-    private static final int MAX_POINTS_PER_DRIVER = 10;
-    private static final int MAX_VEHICLES = 5;
-
-    private static final int MAX_WEIGHT = 550;
-    private static final double BMM_LAT = 55.592605;
-    private static final double BMM_LON = 37.747183;
 
     public void optimizeAndDisplayRoutes() {
         try {
@@ -53,7 +43,7 @@ public class RouteOptimizationService {
                 parseCoordinates[i][1] = coordinates.get(i)[1];
             }
 
-            String requestJson = buildORSOptimizationJson(coordinates, weights);
+            String requestJson = BuildORS.buildORSOptimizationJson(coordinates, weights);
             String response = sendORSRequest(requestJson);
 
             Map<Integer, List<double[]>> routes =
@@ -121,73 +111,6 @@ public class RouteOptimizationService {
             driverWeights.put(driverId, weightsForDriver);
         }
         return driverWeights;
-    }
-
-    private String buildORSOptimizationJson(List<double[]> coordinates, List<Integer> weights) {
-        int neededVehicles =
-                Math.min((int) Math.ceil((double) coordinates.size() / MAX_POINTS_PER_DRIVER), MAX_VEHICLES);
-
-        StringBuilder jobs = new StringBuilder();
-        for (int i = 0; i < coordinates.size(); i++) {
-           double[] c = coordinates.get(i);
-           int weight = weights.get(i);
-
-            jobs.append("""
-                {
-                  "id": %d,
-                  "location": [%f, %f],
-                  "amount": [%d, 1]
-                }
-                """.formatted(
-                    i,
-                    c[1], c[0],
-                    weight
-            ));
-
-            if (i < coordinates.size() - 1) jobs.append(",");
-        }
-
-        StringBuilder vehicles = new StringBuilder();
-        for (int i = 0; i < neededVehicles; i++) {
-            vehicles.append("""
-                {
-                  "id": %d,
-                  "start": [%f, %f],
-                  "capacity": [%d, %d],
-                  "profile": "driving-car"
-                }
-                """.formatted(
-                    i,
-                    BMM_LON, BMM_LAT,
-                    MAX_WEIGHT,
-                    MAX_POINTS_PER_DRIVER
-            ));
-
-            if (i < neededVehicles - 1) vehicles.append(",");
-        }
-
-        return """
-        {
-          "jobs": [%s],
-          "vehicles": [%s]
-        }
-        """.formatted(jobs, vehicles);
-    }
-
-
-    private String sendORSRequest(String json) throws Exception {
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://api.openrouteservice.org/optimization"))
-                .header("Authorization", API_KEY)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(json))
-                .build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 200) {
-            throw new RuntimeException("ORS API returned code " + response.statusCode() + ": " + response.body());
-        }
-        return response.body();
     }
 
     private static Map<Integer, List<String>> mapAddressesToRoutes(

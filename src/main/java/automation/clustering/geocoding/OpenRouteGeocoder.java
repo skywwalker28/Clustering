@@ -165,7 +165,6 @@ public class OpenRouteGeocoder {
                 return null;
             }
 
-            String foundAddress = firstSuggestion.path("value").asText();
             String qc = data.path("qc").asText("");
             String qcGeo = data.path("qc_geo").asText("");
 
@@ -179,10 +178,7 @@ public class OpenRouteGeocoder {
                 default -> "неизвестная точность";
             };
 
-            System.out.println("Place: " + foundAddress);
             System.out.println("Coordinates: [" + longitude + ", " + latitude + "]");
-            System.out.println("QC: " + qc);
-            System.out.println("QCGeo: " + qcGeo);
             System.out.println("GeoAccuracy: " + geoAccuracy);
             System.out.println("\n");
 
@@ -228,7 +224,6 @@ public class OpenRouteGeocoder {
             String result = firstResult.path("result").asText();
 
             System.out.println("Clean geocoding result: " + result);
-            System.out.println("QC (clean): " + qc);
             System.out.println("QC_GEO (clean): " + qcGeo);
             System.out.println("Coordinates (clean): [" + longitude + ", " + latitude + "]");
 
@@ -263,8 +258,6 @@ public class OpenRouteGeocoder {
             }
         }
 
-        System.out.println("\n Result: Successfully geocoded " + results.size()
-                + " from " + addresses.size() + " addresses");
         return results;
     }
 }
