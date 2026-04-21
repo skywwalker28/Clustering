@@ -9,6 +9,21 @@ public class RouteMapExporter {
     private static final String[] COLORS = {"red", "blue", "green", "orange", "purple"};
     private static final double[] BMM_POINT = {55.592605, 37.747183};
 
+    private static String escapeJsString(String s) {
+        if (s == null) return "";
+        return s
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t")
+                .replace("'", "\\'");
+    }
+
+    private static String formatDouble(double value) {
+        return String.format("%.6f", value).replace(",", ".");
+    }
+
     public static void exportHtmlMap(
             Map<Integer, List<double[]>> routes,
             Map<Integer, List<String>> addresses,
@@ -26,7 +41,6 @@ public class RouteMapExporter {
                         <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
                         <style>
                             #map { height: 100vh; }
-                    
                             .legend {
                                 position: absolute;
                                 top: 10px;
@@ -40,13 +54,11 @@ public class RouteMapExporter {
                                 line-height: 18px;
                                 z-index: 1000;
                             }
-                    
                             .legend-item {
                                 display: flex;
                                 align-items: center;
                                 margin-bottom: 6px;
                             }
-                    
                             .legend-color {
                                 width: 14px;
                                 height: 14px;
@@ -64,38 +76,27 @@ public class RouteMapExporter {
                     """);
 
             writer.write("""
-                    var bmmLatLng = [55.592605, 37.747183];
-                    
-                    
-                    L.circleMarker(bmmLatLng, {
-                        radius: 14,
-                        color: '#000',
-                        weight: 2,
-                        fillColor: '#FFD700',
-                        fillOpacity: 0.8
-                    }).addTo(map);
-                    
-                    
-                    L.circleMarker(bmmLatLng, {
-                        radius: 6,
-                        color: '#000',
-                        weight: 1,
-                        fillColor: '#FF4500',
-                        fillOpacity: 1
-                    }).addTo(map)
-                      .bindPopup("<b>BMM</b><br/>Центральный склад / точка старта");
-                    """);
-
-
-            writer.write("""
-                    L.tooltip({
-                        permanent: true,
-                        direction: 'top',
-                        className: 'bmm-label'
-                    })
-                    .setLatLng(bmmLatLng)
-                    .setContent('BMM')
-                    .addTo(map);
+                        var bmmLatLng = [""" + formatDouble(BMM_POINT[0]) + ", " + formatDouble(BMM_POINT[1]) + """
+                        ];
+                        L.circleMarker(bmmLatLng, {
+                            radius: 14,
+                            color: '#000',
+                            weight: 2,
+                            fillColor: '#FFD700',
+                            fillOpacity: 0.8
+                        }).addTo(map);
+                        L.circleMarker(bmmLatLng, {
+                            radius: 6,
+                            color: '#000',
+                            weight: 1,
+                            fillColor: '#FF4500',
+                            fillOpacity: 1
+                        }).addTo(map).bindPopup("<b>BMM</b><br/>Центральный склад / точка старта");
+                        L.tooltip({
+                            permanent: true,
+                            direction: 'top',
+                            className: 'bmm-label'
+                        }).setLatLng(bmmLatLng).setContent('BMM').addTo(map);
                     """);
 
             for (Map.Entry<Integer, List<double[]>> entry : routes.entrySet()) {
@@ -103,54 +104,44 @@ public class RouteMapExporter {
                 List<double[]> points = entry.getValue();
                 List<String> driverAddresses = addresses.get(driverId);
                 String color = COLORS[driverId % COLORS.length];
+                int driverNumber = driverId + 1;
 
-                writer.write("var latlngs" + driverId + " = [\n");
-
-                writer.write(String.format("  [%f, %f],\n", BMM_POINT[0], BMM_POINT[1]));
-
+                writer.write("        var latlngs" + driverId + " = [\n");
+                writer.write("            [" + formatDouble(BMM_POINT[0]) + ", " +
+                        formatDouble(BMM_POINT[1]) + "],\n");
                 for (double[] p : points) {
-                    writer.write(String.format("  [%f, %f],\n", p[0], p[1]));
+                    writer.write("            [" + formatDouble(p[0]) + ", " + formatDouble(p[1]) + "],\n");
                 }
-
-                writer.write("];\n");
+                writer.write("        ];\n\n");
 
                 for (int i = 0; i < points.size(); i++) {
                     double[] p = points.get(i);
-                    String address = driverAddresses.get(i).replace("\"", "");
-
-                    writer.write(String.format(
-                            "L.marker([%f, %f]).addTo(map)\n" +
-                                    " .bindPopup(\"Driver %d<br/>%s\");\n",
-                            p[0], p[1], driverId + 1, address
-                    ));
+                    String address = escapeJsString(driverAddresses.get(i));
+                    writer.write("        L.marker([" + formatDouble(p[0]) + ", " + formatDouble(p[1]) + "])\n");
+                    writer.write("            .addTo(map)\n");
+                    writer.write("            .bindPopup(\"Driver " + driverNumber + "<br/>" + address + "\");\n");
                 }
+                writer.write("\n");
 
-                writer.write(String.format(
-                        "L.polyline(latlngs%d, {color: '%s'}).addTo(map);\n",
-                        driverId, color
-                ));
+                writer.write("        L.polyline(latlngs" + driverId + ", {color: '" +
+                        color + "', weight: 3, opacity: 0.8}).addTo(map);\n\n");
 
-                writer.write(String.format(
-                        "document.getElementById('legend').innerHTML += " +
-                                "`<div class='legend-item'>" +
-                                "<div class='legend-color' style='background:%s'></div>" +
-                                "Driver %d</div>`;\n",
-                        color,
-                        driverId + 1
-                ));
-
+                writer.write("        document.getElementById('legend').innerHTML += \n");
+                writer.write("            `<div class='legend-item'><div class='legend-color' style='background:" +
+                        color + "'></div>Driver " + driverNumber + "</div>`;\n\n");
             }
 
             writer.write("""
-            </script>
-            </body>
-            </html>
-            """);
+                    </script>
+                    </body>
+                    </html>
+                    """);
 
             System.out.println("🗺 HTML map created: " + fileName);
 
         } catch (Exception e) {
             System.err.println("Error creating map: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }

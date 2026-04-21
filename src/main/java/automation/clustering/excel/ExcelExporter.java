@@ -42,11 +42,10 @@ public class ExcelExporter {
 
             if (points.isEmpty()) continue;
 
-            // цвет водителя
             String hexColor = DRIVER_COLORS[driverId % DRIVER_COLORS.length];
             XSSFColor driverColor = Styles.createColor(hexColor);
 
-            // Заголовок водителя
+
             Row driverHeaderRow = sheet.createRow(currentRow++);
             Cell driverCell = driverHeaderRow.createCell(0);
             driverCell.setCellValue("Водитель: " + driverNumber);
@@ -59,10 +58,10 @@ public class ExcelExporter {
             sheet.addMergedRegion(
                     new CellRangeAddress(currentRow - 1, currentRow -1, 0, 7));
 
-            // Инфо по водителю
+
             Row infoRow = sheet.createRow(currentRow++);
             double totalDistance = RouteDistance.getRouteDistance(points);
-            double estimatedTime = Styles.calculateEstimatedTime(totalDistance);
+
 
             int totalWeights = (weights != null) ? weights.stream().mapToInt(Integer::intValue).sum() : 0;
             double fillPercent = Math.min((double) totalWeights / 550 * 100, 100);
@@ -80,7 +79,7 @@ public class ExcelExporter {
             weightCell.setCellStyle(weightStyle);
             infoRow.createCell(7).setCellValue("");
 
-            // Таблица маршрута
+
             Row tableHeaderRow = sheet.createRow(currentRow++);
             String[] headers = {"№", "Адрес доставки", "Вес точки (кг)", "Дистанция участка (км)",
                     "Накопленная дистанция (км)", "Примерное время до точки"};

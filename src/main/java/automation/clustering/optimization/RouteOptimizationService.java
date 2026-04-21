@@ -19,17 +19,25 @@ public class RouteOptimizationService {
 
     public void optimizeAndDisplayRoutes() {
         try {
+
+            System.out.println("start method optimizeAndDisplayRoutes");
+
             List<DeliveryPoint> points =
-                    ExcelReader.readDeliveryPointsFromExcel("/Users/skywalker/Downloads/ИМТЭК 22.12.2025.xlsx");
+                    ExcelReader.readDeliveryPointsFromExcel("/Users/skywalker/Downloads/21.04.26.xlsx");
+
+            System.out.println("get points: " + points + "\n\nNow going to address");
 
             List<String> addresses = points.stream()
                     .map(DeliveryPoint::getAddress)
                     .toList();
 
+            System.out.println("get addresses: " + addresses + "\n\nNow going to weights");
+
             List<Integer> weights = points.stream()
                     .map(DeliveryPoint::getWeightKg)
                     .toList();
 
+            System.out.println("get weights: " + weights + "\n\nNow going to coordinates");
 
             List<double[]> coordinates = OpenRouteGeocoder.geocodingAddresses(addresses);
             if (coordinates.isEmpty()) {
@@ -37,14 +45,21 @@ public class RouteOptimizationService {
                 return;
             }
 
+            System.out.println("get coordinates: " + coordinates + "\n\nNow going to parseCoordinates");
+
             double[][] parseCoordinates = new double[coordinates.size()][2];
             for (int i = 0; i < coordinates.size(); i++) {
                 parseCoordinates[i][0] = coordinates.get(i)[0];
                 parseCoordinates[i][1] = coordinates.get(i)[1];
             }
 
+            System.out.println("get parseCoordinates: " + Arrays.toString(parseCoordinates) +
+                    "\n\nNow going to requestJson and response");
+
             String requestJson = BuildORS.buildORSOptimizationJson(coordinates, weights);
             String response = sendORSRequest(requestJson);
+
+            System.out.println("get requestJson: " + requestJson + "\nand response: " + response);
 
             Map<Integer, List<double[]>> routes =
                     OptimizationResponse.parseOptimizationResponse(response, parseCoordinates);
