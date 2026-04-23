@@ -2,20 +2,34 @@ package automation.clustering.excel;
 
 import org.apache.poi.ss.usermodel.*;
 import java.awt.Color;
+
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFColor;
 
 public class Styles {
 
-    static CellStyle createHeaderStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
+    private static final String[] DRIVER_COLORS = {"#FF0000", "#0000FF", "#00FF00", "#FFA500", "#800080"};
+
+    static Font boldText(Workbook workbook) {
         Font font = workbook.createFont();
         font.setBold(true);
-        font.setColor(IndexedColors.WHITE.getIndex());
-        style.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+        return font;
+    }
+
+    static CellStyle createHeadersStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
         style.setAlignment(HorizontalAlignment.CENTER);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setFont(font);
+
+        style.setFont(boldText(workbook));
+
+        return style;
+    }
+
+    static CellStyle createCenterText(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setAlignment(HorizontalAlignment.CENTER);
+
         return style;
     }
 
@@ -30,51 +44,49 @@ public class Styles {
         return style;
     }
 
-    static CellStyle createAddressStyleStyle(Workbook workbook) {
+    static CellStyle createAddressStyle(Workbook workbook) {
         CellStyle style = workbook.createCellStyle();
         style.setAlignment(HorizontalAlignment.LEFT);
         style.setWrapText(true);
         return style;
     }
 
-    static CellStyle createDistanceStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        style.setDataFormat(workbook.createDataFormat().getFormat("0.00"));
-        Font font = workbook.createFont();
-        font.setColor(IndexedColors.DARK_GREEN.getIndex());
-        style.setFont(font);
-        return style;
+    static CellStyle createDriverStyle(Workbook workbook, int driverId) {
+        String hexColor = DRIVER_COLORS[driverId % DRIVER_COLORS.length];
+        XSSFColor driverColor = Styles.createColor(hexColor);
+
+        XSSFCellStyle driverCellStyle = (XSSFCellStyle) workbook.createCellStyle();
+        driverCellStyle.cloneStyleFrom(createDriverStyle(workbook));
+        driverCellStyle.setFillForegroundColor(driverColor);
+        driverCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+        return driverCellStyle;
     }
 
-    static CellStyle createTimeStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        style.setDataFormat(workbook.createDataFormat().getFormat("0.0"));
-        Font font = workbook.createFont();
-        font.setColor(IndexedColors.DARK_RED.getIndex());
-        style.setFont(font);
-        return style;
-    }
 
-    static double calculateEstimatedTime(double totalDistanceMeters) {
-        double averageSpeedKm = 40.0;
-        double timePerPointMinutes = 5.0;
-
-        double distanceKm = totalDistanceMeters / 1000;
-        double drivingTimeHours = distanceKm / averageSpeedKm;
-        double deliveryTimeHours = (3 * timePerPointMinutes) / 60.0;
-
-        return Math.round((drivingTimeHours + deliveryTimeHours) * 10.0) / 10.0;
-    }
 
     static double calculateSegmentTime(double segmentDistanceMeters) {
         double averageSpeedKm = 40.0;
         double distanceKm = segmentDistanceMeters / 1000;
-        return Math.round((distanceKm / averageSpeedKm) * 10.0) / 10.0;
+        double timeHours = distanceKm / averageSpeedKm;
+        double timeMinutes = timeHours * 60;
+        return Math.round(timeMinutes);
     }
 
     public static XSSFColor createColor(String hexColor) {
         Color awtColor = Color.decode(hexColor);
         byte[] rgb = new byte[]{(byte) awtColor.getRed(), (byte) awtColor.getGreen(), (byte) awtColor.getBlue()};
         return new XSSFColor(rgb, null);
+    }
+
+    static String calculateTime(double minutes) {
+        double diff = minutes / 60.0;
+
+        int hours = (int) diff;
+        double residue = diff % 1;
+
+        int residueMin = (int) (residue * 60);
+
+        return hours != 0 ? hours + "ч " + residueMin + " мин" : (int) minutes + " мин";
     }
 }

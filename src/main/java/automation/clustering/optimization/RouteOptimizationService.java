@@ -17,13 +17,14 @@ public class RouteOptimizationService {
     public static final String API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRlOD" +
           "I1N2ZkOGU1YzRmZjdiMjgxNTJhYWViZjFkZDY2IiwiaCI6Im11cm11cjY0In0=";
 
+    public static final String filepath = "/Users/skywalker/Downloads/23.04 реестр.xlsx";
+
     public void optimizeAndDisplayRoutes() {
         try {
-
             System.out.println("start method optimizeAndDisplayRoutes");
 
             List<DeliveryPoint> points =
-                    ExcelReader.readDeliveryPointsFromExcel("/Users/skywalker/Downloads/21.04.26.xlsx");
+                    ExcelReader.readDeliveryPointsFromExcel(filepath);
 
             System.out.println("get points: " + points + "\n\nNow going to address");
 
@@ -35,6 +36,10 @@ public class RouteOptimizationService {
 
             List<Integer> weights = points.stream()
                     .map(DeliveryPoint::getWeightKg)
+                    .toList();
+
+            List<Integer> number = points.stream()
+                    .map(DeliveryPoint::getNumber)
                     .toList();
 
             System.out.println("get weights: " + weights + "\n\nNow going to coordinates");
@@ -57,6 +62,8 @@ public class RouteOptimizationService {
                     "\n\nNow going to requestJson and response");
 
             String requestJson = BuildORS.buildORSOptimizationJson(coordinates, weights);
+            System.out.println("REQUEST JSON:\n" + requestJson);
+
             String response = sendORSRequest(requestJson);
 
             System.out.println("get requestJson: " + requestJson + "\nand response: " + response);
@@ -68,6 +75,7 @@ public class RouteOptimizationService {
 
             Map<Integer, List<String>> driverAddresses = mapAddressesToRoutes(routes, addresses, coordinates);
 
+            Map<Integer, List<Integer>> driverNumber = getIntegerListMap(routes, coordinates, number);
 
             RouteMapExporter.exportHtmlMap(routes, driverAddresses, "routes_map.html");
 
@@ -89,10 +97,8 @@ public class RouteOptimizationService {
 
             System.out.println("\nВсего распределенно точек: " + totalPoints + "/" + coordinates.size());
 
-            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-
-            ExcelExporter.exportToExcelSingleSheet(routes, driverAddresses, driverWeights,
-                    "optimized_routes_" + timestamp + ".xlsx");
+            ExcelExporter.exportToExcelSingleSheet(routes, driverAddresses, driverWeights, driverNumber,
+                    "optimized_routes.xlsx");
 
         } catch (Exception e) {
             System.err.println("Error in RouteOptimizationService: " + e.getMessage());

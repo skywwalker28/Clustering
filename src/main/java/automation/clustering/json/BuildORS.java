@@ -1,5 +1,6 @@
 package automation.clustering.json;
 
+import automation.clustering.excel.ExcelReadCountDrivers;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -7,18 +8,26 @@ import java.net.http.HttpResponse;
 import java.util.List;
 
 import static automation.clustering.optimization.RouteOptimizationService.API_KEY;
+import static automation.clustering.optimization.RouteOptimizationService.filepath;
 
 public class BuildORS {
-    private static final int MAX_POINTS_PER_DRIVER = 10;
+    private static final int MAX_POINTS_PER_DRIVER = 8;
     private static final int MAX_VEHICLES = 5;
 
     private static final int MAX_WEIGHT = 550;
     private static final double BMM_LAT = 55.592605;
     private static final double BMM_LON = 37.747183;
 
+
     public static String buildORSOptimizationJson(List<double[]> coordinates, List<Integer> weights) {
-        int neededVehicles =
-                Math.min((int) Math.ceil((double) coordinates.size() / MAX_POINTS_PER_DRIVER), MAX_VEHICLES);
+        ExcelReadCountDrivers countDrivers = new ExcelReadCountDrivers();
+        int excelCell = countDrivers.getDriverCount(filepath);
+
+        int neededVehicles = excelCell == 0 || excelCell > 3 ?
+                Math.min((int) Math.ceil((double) coordinates.size() / MAX_POINTS_PER_DRIVER), MAX_VEHICLES) :
+                excelCell;
+
+        System.out.println("Выбрано водителей: " + neededVehicles);
 
         StringBuilder jobs = new StringBuilder();
         for (int i = 0; i < coordinates.size(); i++) {
@@ -62,9 +71,14 @@ public class BuildORS {
         return """
         {
           "jobs": [%s],
-          "vehicles": [%s]
+          "vehicles": [%s],
+          "options": {
+            "min_vehicles": %d,
+            "max_vehicles": %d,
+            "gzip": false
+          }
         }
-        """.formatted(jobs, vehicles);
+        """.formatted(jobs, vehicles, neededVehicles, neededVehicles);
     }
 
     public static String sendORSRequest(String json) throws Exception {

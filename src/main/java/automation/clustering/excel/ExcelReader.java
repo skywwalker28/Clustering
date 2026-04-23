@@ -32,7 +32,8 @@ public class ExcelReader {
                     }
 
                     Cell addressCell = row.getCell(2);
-                    Cell weightCell = row.getCell(4);
+                    Cell weightCell = row.getCell(5);
+                    Cell numberCell = row.getCell(1);
 
 
                     if (addressCell == null || weightCell == null) {
@@ -46,8 +47,9 @@ public class ExcelReader {
                     System.out.println(rawAddress + ", " + cleanAddress);
 
                     int weight = (int) weightCell.getNumericCellValue();
+                    int number = (int) numberCell.getNumericCellValue();
 
-                    points.add(new DeliveryPoint(cleanAddress, weight));
+                    points.add(new DeliveryPoint(cleanAddress, weight, number));
                 }
             }
 
