@@ -1,14 +1,15 @@
 package automation.clustering.optimization;
 
-import automation.clustering.json.BuildORS;
 import automation.clustering.excel.ExcelExporter;
 import automation.clustering.excel.ExcelReader;
 import automation.clustering.geocoding.OpenRouteGeocoder;
 import automation.clustering.map.RouteMapExporter;
 import automation.clustering.model.DeliveryPoint;
 import org.springframework.stereotype.Service;
-import java.text.SimpleDateFormat;
 import java.util.*;
+
+import static automation.clustering.json.BuildORS.buildORSOptimizationJson;
+import static automation.clustering.path.GetPath.getPathToLatestFile;
 import static automation.clustering.json.BuildORS.sendORSRequest;
 
 @Service
@@ -17,22 +18,17 @@ public class RouteOptimizationService {
     public static final String API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRlOD" +
           "I1N2ZkOGU1YzRmZjdiMjgxNTJhYWViZjFkZDY2IiwiaCI6Im11cm11cjY0In0=";
 
-    public static final String filepath = "/Users/skywalker/Downloads/23.04 реестр.xlsx";
+    public static final String filepath = getPathToLatestFile();
 
     public void optimizeAndDisplayRoutes() {
         try {
-            System.out.println("start method optimizeAndDisplayRoutes");
-
             List<DeliveryPoint> points =
                     ExcelReader.readDeliveryPointsFromExcel(filepath);
 
-            System.out.println("get points: " + points + "\n\nNow going to address");
 
             List<String> addresses = points.stream()
                     .map(DeliveryPoint::getAddress)
                     .toList();
-
-            System.out.println("get addresses: " + addresses + "\n\nNow going to weights");
 
             List<Integer> weights = points.stream()
                     .map(DeliveryPoint::getWeightKg)
@@ -50,7 +46,6 @@ public class RouteOptimizationService {
                 return;
             }
 
-            System.out.println("get coordinates: " + coordinates + "\n\nNow going to parseCoordinates");
 
             double[][] parseCoordinates = new double[coordinates.size()][2];
             for (int i = 0; i < coordinates.size(); i++) {
@@ -58,28 +53,16 @@ public class RouteOptimizationService {
                 parseCoordinates[i][1] = coordinates.get(i)[1];
             }
 
-            System.out.println("get parseCoordinates: " + Arrays.toString(parseCoordinates) +
-                    "\n\nNow going to requestJson and response");
-
-            String requestJson = BuildORS.buildORSOptimizationJson(coordinates, weights);
-            System.out.println("REQUEST JSON:\n" + requestJson);
-
+            String requestJson = buildORSOptimizationJson(coordinates, weights);
             String response = sendORSRequest(requestJson);
-
-            System.out.println("get requestJson: " + requestJson + "\nand response: " + response);
 
             Map<Integer, List<double[]>> routes =
                     OptimizationResponse.parseOptimizationResponse(response, parseCoordinates);
-
             Map<Integer, List<Integer>> driverWeights = getIntegerListMap(routes, coordinates, weights);
-
             Map<Integer, List<String>> driverAddresses = mapAddressesToRoutes(routes, addresses, coordinates);
-
             Map<Integer, List<Integer>> driverNumber = getIntegerListMap(routes, coordinates, number);
 
             RouteMapExporter.exportHtmlMap(routes, driverAddresses, "routes_map.html");
-
-            System.out.println("Всего требуется водителей: " + routes.size());
 
             int totalPoints = 0;
             for (Map.Entry<Integer, List<double[]>> entry : routes.entrySet()) {
@@ -150,7 +133,9 @@ public class RouteOptimizationService {
             List<String> driverAddresses = new ArrayList<>();
             for (double[] point : entry.getValue()) {
                 String key = String.format("%.6f,%.6f", point[0], point[1]);
-                driverAddresses.add(coordToAddress.getOrDefault(key, String.format("[%.6f, %.6f]", point[0], point[1])));
+                driverAddresses.add(coordToAddress.getOrDefault(
+                        key, String.format("[%.6f, %.6f]", point[0], point[1]))
+                );
             }
             result.put(entry.getKey(), driverAddresses);
         }

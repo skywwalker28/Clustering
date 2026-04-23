@@ -1,33 +1,23 @@
 package automation.clustering.test;
 
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.File;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Optional;
 
 class TestExcel {
+
+
     public static void main(String[] args) {
+        String test = System.getProperty("user.home") + "/Downloads";
+        File downloadDir = new File(test);
 
-        try (FileInputStream file = new FileInputStream("/Users/skywalker/Downloads/22.04 Артур.xlsx")) {
-            Workbook workbook = new XSSFWorkbook(file);
+        File[] excelFiles = downloadDir.listFiles((dir, name) ->
+                name.toLowerCase().endsWith(".xlsx") || name.toLowerCase().endsWith(".xls"));
 
-            Sheet page = workbook.getSheetAt(0);
-
-            Row row = page.getRow(0);
-
-            Cell cell = row.getCell(6);
+        Optional<File> latestFile = Arrays.stream(excelFiles).max(Comparator.comparingLong(File::lastModified));
 
 
-            int number = (int) cell.getNumericCellValue();
-
-            System.out.println(number);
-
-        } catch (IOException e) {
-            System.out.println(e.getMessage());
-        }
+        System.out.println(latestFile.get().getAbsolutePath());
     }
 }

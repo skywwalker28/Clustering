@@ -64,7 +64,7 @@ public class ExcelExporter {
 
 
             double totalDistance = 0.0;
-            double totalTime = 0;
+            double totalTime = 60;
             int totalWeights = (weights != null) ? weights.stream().mapToInt(Integer::intValue).sum() : 0;
 
             for (int i = 0; i < points.size(); i++) {
@@ -95,7 +95,7 @@ public class ExcelExporter {
                 segmentCell.setCellValue((int) (segmentDistance / 1000));
                 segmentCell.setCellStyle(centerText);
 
-                totalTime += segmentTime;
+                totalTime += segmentTime + 15;
 
                 Cell timeToPointCell = row.createCell(4);
                 timeToPointCell.setCellValue(segmentTime);
