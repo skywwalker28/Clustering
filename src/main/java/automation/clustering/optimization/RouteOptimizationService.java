@@ -2,7 +2,6 @@ package automation.clustering.optimization;
 
 import automation.clustering.excel.ExcelExporter;
 import automation.clustering.excel.ExcelReader;
-import automation.clustering.geocoding.OpenRouteGeocoder;
 import automation.clustering.map.RouteMapExporter;
 import automation.clustering.model.DeliveryPoint;
 import org.springframework.stereotype.Service;
@@ -11,6 +10,9 @@ import java.util.*;
 import static automation.clustering.json.BuildORS.buildORSOptimizationJson;
 import static automation.clustering.path.GetPath.getPathToLatestFile;
 import static automation.clustering.json.BuildORS.sendORSRequest;
+import static automation.clustering.geocoding.GeocodingAddresses.getCoordinates;
+import static automation.clustering.optimization.HelperOptimization.getRelationship;
+import static automation.clustering.optimization.HelperOptimization.parseORSResponse;
 
 @Service
 public class RouteOptimizationService {
@@ -21,124 +23,46 @@ public class RouteOptimizationService {
     public static final String filepath = getPathToLatestFile();
 
     public void optimizeAndDisplayRoutes() {
+        System.out.println("\n");
+
         try {
-            List<DeliveryPoint> points =
-                    ExcelReader.readDeliveryPointsFromExcel(filepath);
+            System.out.println("Excel file: " + filepath);
+            List<DeliveryPoint> points = ExcelReader.readDeliveryPointsFromExcel("/Users/skywalker/Downloads/28.04 розница.xlsx");
+            List<double[]> coordinates = getCoordinates(points);
 
+            if (coordinates.isEmpty()) throw new RuntimeException("List coordinates is empty!");
+            Map<String, DeliveryPoint> pointsAndCoordinates = getRelationship(coordinates, points);
 
-            List<String> addresses = points.stream()
-                    .map(DeliveryPoint::getAddress)
-                    .toList();
-
-            List<Integer> weights = points.stream()
-                    .map(DeliveryPoint::getWeightKg)
-                    .toList();
-
-            List<Integer> number = points.stream()
-                    .map(DeliveryPoint::getNumber)
-                    .toList();
-
-            System.out.println("get weights: " + weights + "\n\nNow going to coordinates");
-
-            List<double[]> coordinates = OpenRouteGeocoder.geocodingAddresses(addresses);
-            if (coordinates.isEmpty()) {
-                System.err.println("Error: No coordinates available!");
-                return;
-            }
-
-
-            double[][] parseCoordinates = new double[coordinates.size()][2];
-            for (int i = 0; i < coordinates.size(); i++) {
-                parseCoordinates[i][0] = coordinates.get(i)[0];
-                parseCoordinates[i][1] = coordinates.get(i)[1];
-            }
-
-            String requestJson = buildORSOptimizationJson(coordinates, weights);
+            String requestJson = buildORSOptimizationJson(coordinates, points);
             String response = sendORSRequest(requestJson);
 
-            Map<Integer, List<double[]>> routes =
-                    OptimizationResponse.parseOptimizationResponse(response, parseCoordinates);
-            Map<Integer, List<Integer>> driverWeights = getIntegerListMap(routes, coordinates, weights);
-            Map<Integer, List<String>> driverAddresses = mapAddressesToRoutes(routes, addresses, coordinates);
-            Map<Integer, List<Integer>> driverNumber = getIntegerListMap(routes, coordinates, number);
+            Map<Integer, List<DeliveryPoint>> driverAndPoints = new HashMap<>();
 
-            RouteMapExporter.exportHtmlMap(routes, driverAddresses, "routes_map.html");
+            Map<Integer, List<double[]>> driverAndCoordinate = new HashMap<>();
+
+            parseORSResponse(response, pointsAndCoordinates, driverAndPoints, driverAndCoordinate);
+
+            RouteMapExporter.exportHtmlMap(driverAndPoints, "карта_кластеризации.html");
 
             int totalPoints = 0;
-            for (Map.Entry<Integer, List<double[]>> entry : routes.entrySet()) {
+            for (Map.Entry<Integer, List<DeliveryPoint>> entry : driverAndPoints.entrySet()) {
                 int driverNum = entry.getKey() + 1;
-                List<double[]> route = entry.getValue();
+                List<DeliveryPoint> getAddresses = entry.getValue();
 
-                totalPoints += route.size();
-                System.out.println("\nDriver " + driverNum + ": " + route.size() + " points");
+                System.out.println("\nВоидетль " + driverNum + ". Всего точек: " + getAddresses.size());
 
-                List<String> addressesForDriver = driverAddresses.get(entry.getKey());
-                for (int i = 0; i < addressesForDriver.size(); i++) {
-                    System.out.println(" " + (i + 1) + ". " + addressesForDriver.get(i));
+                for (DeliveryPoint current : getAddresses) {
+                    totalPoints++;
+                    System.out.println(current.getNumber() + ". " + current.getAddress());
                 }
             }
 
             System.out.println("\nВсего распределенно точек: " + totalPoints + "/" + coordinates.size());
 
-            ExcelExporter.exportToExcelSingleSheet(routes, driverAddresses, driverWeights, driverNumber,
-                    "optimized_routes.xlsx");
+            ExcelExporter.exportToExcelSingleSheet("Реестр(Java).xlsx", driverAndPoints, driverAndCoordinate);
 
         } catch (Exception e) {
             System.err.println("Error in RouteOptimizationService: " + e.getMessage());
-            e.printStackTrace();
         }
-    }
-
-    private static Map<Integer, List<Integer>> getIntegerListMap(Map<Integer, List<double[]>> routes,
-                                                                 List<double[]> coordinates, List<Integer> weights) {
-        Map<Integer, List<Integer>> driverWeights = new HashMap<>();
-        for (Map.Entry<Integer, List<double[]>> entry : routes.entrySet()) {
-            int driverId = entry.getKey();
-            List<double[]> routePoints = entry.getValue();
-            List<Integer> weightsForDriver = new ArrayList<>();
-
-            for (double[] point : routePoints) {
-                int index = -1;
-                for (int i = 0; i < coordinates.size(); i++) {
-                    if (coordinates.get(i)[0] == point[0] && coordinates.get(i)[1] == point[1]) {
-                        index = i;
-                        break;
-                    }
-                }
-                if (index != -1) {
-                    weightsForDriver.add(weights.get(index));
-                } else {
-                    weightsForDriver.add(0);
-                }
-            }
-
-            driverWeights.put(driverId, weightsForDriver);
-        }
-        return driverWeights;
-    }
-
-    private static Map<Integer, List<String>> mapAddressesToRoutes(
-            Map<Integer, List<double[]>> driverRoutes,
-            List<String> originalAddresses,
-            List<double[]> allPoints
-    ) {
-        Map<Integer, List<String>> result = new HashMap<>();
-        Map<String, String> coordToAddress = new HashMap<>();
-        for (int i = 0; i < allPoints.size(); i++) {
-            String key = String.format("%.6f,%.6f", allPoints.get(i)[0], allPoints.get(i)[1]);
-            coordToAddress.put(key, originalAddresses.get(i));
-        }
-
-        for (Map.Entry<Integer, List<double[]>> entry : driverRoutes.entrySet()) {
-            List<String> driverAddresses = new ArrayList<>();
-            for (double[] point : entry.getValue()) {
-                String key = String.format("%.6f,%.6f", point[0], point[1]);
-                driverAddresses.add(coordToAddress.getOrDefault(
-                        key, String.format("[%.6f, %.6f]", point[0], point[1]))
-                );
-            }
-            result.put(entry.getKey(), driverAddresses);
-        }
-        return result;
     }
 }

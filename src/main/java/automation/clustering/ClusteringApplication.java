@@ -23,3 +23,4 @@ public class ClusteringApplication implements CommandLineRunner {
         optimizationService.optimizeAndDisplayRoutes();
     }
 }
+

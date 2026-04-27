@@ -1,6 +1,8 @@
 package automation.clustering.json;
 
 import automation.clustering.excel.ExcelReadCountDrivers;
+import automation.clustering.model.DeliveryPoint;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -16,13 +18,14 @@ public class BuildORS {
     static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
 
-    public static String buildORSOptimizationJson(List<double[]> coordinates, List<Integer> weights) {
+    public static String buildORSOptimizationJson(List<double[]> coordinates, List<DeliveryPoint> weights) {
         ExcelReadCountDrivers countDrivers = new ExcelReadCountDrivers();
         int excelCell = countDrivers.getDriverCount(filepath);
 
         int neededVehicles = excelCell == 0 || excelCell > 3 ?
                 Math.min((int) Math.ceil((double) coordinates.size() / MAX_POINTS_PER_DRIVER), MAX_VEHICLES) :
                 excelCell;
+        System.out.println("neededVehicle: " + neededVehicles);
 
         StringBuilder jobs = CreateStringBuilder.getStringBuilder(coordinates, weights);
         StringBuilder vehicles = CreateStringBuilder.getStringBuilderBMM(neededVehicles);

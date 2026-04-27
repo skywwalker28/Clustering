@@ -1,6 +1,7 @@
 package automation.clustering.excel;
 
 import automation.clustering.distance.RouteDistance;
+import automation.clustering.model.DeliveryPoint;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -9,14 +10,14 @@ import java.io.FileOutputStream;
 import java.util.List;
 import java.util.Map;
 
+
 public class ExcelExporter {
 
 
-    public static void exportToExcelSingleSheet(Map<Integer, List<double[]>> driverRoutes,
-                                                Map<Integer, List<String>> driverAddresses,
-                                                Map<Integer, List<Integer>> driverWeights,
-                                                Map<Integer, List<Integer>> pointNumber,
-                                                String filepath) throws Exception {
+    public static void exportToExcelSingleSheet(
+            String filepath,
+            Map<Integer, List<DeliveryPoint>> driverAndPoint,
+            Map<Integer, List<double[]>> driverAndCoordinate) throws Exception {
         Workbook workbook = new XSSFWorkbook();
 
         CellStyle headersStyle = Styles.createHeadersStyle(workbook);
@@ -40,13 +41,11 @@ public class ExcelExporter {
             cell.setCellStyle(headersStyle);
         }
 
-        for (Map.Entry<Integer, List<double[]>> entry : driverRoutes.entrySet()) {
+        for (Map.Entry<Integer, List<DeliveryPoint>> entry : driverAndPoint.entrySet()) {
             int driverId = entry.getKey();
             int driverNumber = driverId + 1;
-            List<double[]> points = entry.getValue();
-            List<String> addresses = driverAddresses.get(driverId);
-            List<Integer> weights = driverWeights.get(driverId);
-            List<Integer> number = pointNumber.get(driverId);
+            List<DeliveryPoint> points = entry.getValue();
+            List<double[]> coordinates = driverAndCoordinate.get(driverId);
 
             CellStyle driverColor = Styles.createDriverStyle(workbook, driverId);
 
@@ -65,27 +64,27 @@ public class ExcelExporter {
 
             double totalDistance = 0.0;
             double totalTime = 60;
-            int totalWeights = (weights != null) ? weights.stream().mapToInt(Integer::intValue).sum() : 0;
+            int totalWeights = points.stream().mapToInt(DeliveryPoint::getWeightKg).sum();
 
             for (int i = 0; i < points.size(); i++) {
+                DeliveryPoint currentPoint = points.get(i);
                 Row row = sheet.createRow(currentRow++);
 
                 Cell numberCell = row.createCell(0);
-                numberCell.setCellValue(number.get(i));
+                numberCell.setCellValue(currentPoint.getNumber());
                 numberCell.setCellStyle(centerText);
 
                 Cell addressCell = row.createCell(1);
-                addressCell.setCellValue(addresses.get(i));
+                addressCell.setCellValue(currentPoint.getAddress());
                 addressCell.setCellStyle(addressStyle);
 
                 Cell weightPointCell = row.createCell(2);
 
-                assert weights != null;
-                weightPointCell.setCellValue(weights.get(i));
+                weightPointCell.setCellValue(currentPoint.getWeightKg());
                 weightPointCell.setCellStyle(centerText);
 
-                List<double[]> segment = (i != 0) ? List.of(points.get(i - 1), points.get(i))
-                        : List.of(new double[]{55.592605, 37.747183}, points.get(i));
+                List<double[]> segment = (i != 0) ? List.of(coordinates.get(i - 1), coordinates.get(i))
+                        : List.of(new double[]{55.592605, 37.747183}, coordinates.get(i));
 
                 double segmentDistance = RouteDistance.getRouteDistance(segment);
                 totalDistance += segmentDistance;
@@ -95,7 +94,7 @@ public class ExcelExporter {
                 segmentCell.setCellValue((int) (segmentDistance / 1000));
                 segmentCell.setCellStyle(centerText);
 
-                totalTime += segmentTime + 15;
+                totalTime += segmentTime + 15 + 10;
 
                 Cell timeToPointCell = row.createCell(4);
                 timeToPointCell.setCellValue(segmentTime);

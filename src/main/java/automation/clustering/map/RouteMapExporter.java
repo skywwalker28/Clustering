@@ -1,5 +1,7 @@
 package automation.clustering.map;
 
+import automation.clustering.model.DeliveryPoint;
+
 import java.io.FileWriter;
 import java.util.List;
 import java.util.Map;
@@ -25,8 +27,7 @@ public class RouteMapExporter {
     }
 
     public static void exportHtmlMap(
-            Map<Integer, List<double[]>> routes,
-            Map<Integer, List<String>> addresses,
+            Map<Integer, List<DeliveryPoint>> driverAndPoints,
             String fileName
     ) {
         try (FileWriter writer = new FileWriter(fileName)) {
@@ -99,39 +100,61 @@ public class RouteMapExporter {
                         }).setLatLng(bmmLatLng).setContent('BMM').addTo(map);
                     """);
 
-            for (Map.Entry<Integer, List<double[]>> entry : routes.entrySet()) {
+            for (Map.Entry<Integer, List<DeliveryPoint>> entry : driverAndPoints.entrySet()) {
                 int driverId = entry.getKey();
-                List<double[]> points = entry.getValue();
-                List<String> driverAddresses = addresses.get(driverId);
+                List<DeliveryPoint> route = entry.getValue();
+
+                if (route == null || route.isEmpty()) continue;
+
                 String color = COLORS[driverId % COLORS.length];
                 int driverNumber = driverId + 1;
 
+                // Создаём массив координат для полилинии (BMM + точки маршрута)
+                writer.write("        // Driver " + driverNumber + "\n");
                 writer.write("        var latlngs" + driverId + " = [\n");
-                writer.write("            [" + formatDouble(BMM_POINT[0]) + ", " +
-                        formatDouble(BMM_POINT[1]) + "],\n");
-                for (double[] p : points) {
-                    writer.write("            [" + formatDouble(p[0]) + ", " + formatDouble(p[1]) + "],\n");
+                writer.write("            [" + formatDouble(BMM_POINT[0]) + ", " + formatDouble(BMM_POINT[1]) + "],\n");
+                for (DeliveryPoint point : route) {
+                    writer.write("            [" + formatDouble(point.getLat()) + ", " +
+                            formatDouble(point.getLon()) + "],\n");
                 }
                 writer.write("        ];\n\n");
 
-                for (int i = 0; i < points.size(); i++) {
-                    double[] p = points.get(i);
-                    String address = escapeJsString(driverAddresses.get(i));
-                    writer.write("        L.marker([" + formatDouble(p[0]) + ", " + formatDouble(p[1]) + "])\n");
+                // Создаём маркеры для точек маршрута
+                for (DeliveryPoint point : route) {
+                    String address = escapeJsString(point.getAddress());
+                    int pointNumber = point.getNumber();
+
+                    writer.write("        L.marker([" + formatDouble(point.getLat()) + ", " +
+                            formatDouble(point.getLon()) + "])\n");
                     writer.write("            .addTo(map)\n");
-                    writer.write("            .bindPopup(\"Driver " + driverNumber + "<br/>" + address + "\");\n");
+                    writer.write("            .bindPopup(\"<b>Driver " + driverNumber + "</b><br/>" +
+                            "<b>№" + pointNumber + "</b><br/>" + address + "\");\n");
                 }
                 writer.write("\n");
 
-                writer.write("        L.polyline(latlngs" + driverId + ", {color: '" +
-                        color + "', weight: 3, opacity: 0.8}).addTo(map);\n\n");
+                // Рисуем полилинию маршрута
+                writer.write("        L.polyline(latlngs" + driverId + ", {\n");
+                writer.write("            color: '" + color + "',\n");
+                writer.write("            weight: 3,\n");
+                writer.write("            opacity: 0.8\n");
+                writer.write("        }).addTo(map);\n\n");
 
+                // Добавляем в легенду
                 writer.write("        document.getElementById('legend').innerHTML += \n");
-                writer.write("            `<div class='legend-item'><div class='legend-color' style='background:" +
-                        color + "'></div>Driver " + driverNumber + "</div>`;\n\n");
+                writer.write("            `<div class='legend-item'>\n");
+                writer.write("                <div class='legend-color' style='background:" + color + "'></div>\n");
+                writer.write("                <div>Driver " + driverNumber + " (" + route.size() + " точек)</div>\n");
+                writer.write("            </div>`;\n\n");
             }
 
+            // Добавляем BMM в легенду
             writer.write("""
+                        document.getElementById('legend').innerHTML += '<hr style="margin: 8px 0;">';
+                        document.getElementById('legend').innerHTML += 
+                            `<div class='legend-item'>
+                                <div class='legend-color' style='background:#FFD700; border:1px solid #000;'></div>
+                                <div><b>🏭 BMM</b> (Центральный склад)</div>
+                            </div>`;
                     </script>
                     </body>
                     </html>

@@ -1,23 +1,30 @@
 package automation.clustering.json;
 
+import automation.clustering.model.DeliveryPoint;
+
 import java.util.List;
+import static automation.clustering.drivers.CreateDrivers.ownCreateDrivers;
 
 public class CreateStringBuilder {
     private static final int MAX_WEIGHT = 550;
-    private static final double BMM_LAT = 55.592605;
-    private static final double BMM_LON = 37.747183;
+    public static final double BMM_LAT = 55.592605;
+    public static final double BMM_LON = 37.747183;
 
-    public static StringBuilder getStringBuilder(List<double[]> coordinates, List<Integer> weights) {
+    public static StringBuilder getStringBuilder(
+            List<double[]> coordinates, List<DeliveryPoint> weights) {
+
         StringBuilder jobs = new StringBuilder();
-        for (int i = 1; i <= coordinates.size(); i++) {
+        for (int i = 0; i < coordinates.size(); i++) {
+
             double[] c = coordinates.get(i);
-            int weight = weights.get(i);
+            if (c == null) continue;
+            int weight = weights.get(i).getWeightKg();
 
             jobs.append("""
                 {
                   "id": %d,
                   "location": [%f, %f],
-                  "amount": [%d, 1]
+                  "delivery": [%d, 1]
                 }
                 """.formatted(
                     i,
@@ -25,7 +32,7 @@ public class CreateStringBuilder {
                     weight
             ));
 
-            if (i <= coordinates.size() - 1) jobs.append(",");
+            if (i < coordinates.size() - 1) jobs.append(",");
         }
         return jobs;
     }
@@ -33,7 +40,7 @@ public class CreateStringBuilder {
     public static StringBuilder getStringBuilderBMM(int neededVehicles) {
         StringBuilder vehicles = new StringBuilder();
 
-        for (int i = 1; i <= neededVehicles; i++) {
+        for (int i = 0; i < neededVehicles; i++) {
             vehicles.append("""
                     {
                       "id": %d,
@@ -45,9 +52,14 @@ public class CreateStringBuilder {
                     BMM_LON, BMM_LAT,
                     MAX_WEIGHT, BuildORS.MAX_POINTS_PER_DRIVER));
 
-            if (i <= neededVehicles - 1) vehicles.append(",");
+            if (i < neededVehicles - 1) vehicles.append(",");
         }
 
+//        vehicles.append(ownCreateDrivers(0, 1000, 10, "driving-car"));
+//        vehicles.append(",").append(ownCreateDrivers(1, 600, 10, "driving-car"));
+//        vehicles.append(",").append(ownCreateDrivers(2, 350, 10, "driving-car"));
+
+        System.out.println(vehicles);
         return vehicles;
     }
 }

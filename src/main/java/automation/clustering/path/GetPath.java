@@ -20,7 +20,6 @@ public class GetPath {
         Optional<File> latestFile = Arrays
                 .stream(allExcelFiles)
                 .max(Comparator.comparingLong(File::lastModified));
-
         return latestFile.get().getAbsolutePath();
     }
 }
