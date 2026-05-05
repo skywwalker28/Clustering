@@ -29,7 +29,7 @@ public class ExcelReader {
 
                 Cell numberCell = row.getCell(1);
                 Cell addressCell = row.getCell(2);
-                Cell weightCell = row.getCell(5);
+                Cell weightCell = row.getCell(7);
 
 
                 if (addressCell == null || weightCell == null) {

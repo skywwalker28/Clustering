@@ -8,7 +8,8 @@ import java.util.List;
 
 import static automation.clustering.geocoding.ConnectDaData.connectionToDaData;
 import static automation.clustering.geocoding.GetLatLon.parseJsonAndGetLatLon;
-import static automation.clustering.geocoding.BaseCoordinates.getBaseCoordinate;
+import static automation.clustering.addresses.BaseCoordinates.getBaseCoordinate;
+import static automation.clustering.optimization.CleanAddress.cleanAddress;
 
 public class GeocodingAddresses {
 
@@ -17,12 +18,13 @@ public class GeocodingAddresses {
 
         for (DeliveryPoint current : allAddresses) {
             System.out.println(
-                    "Адрес: " + "\u001B[32m" + current.getNumber() + " " + current.getAddress() + "\u001B[0m");
+                    "Адрес: " + "\u001B[32m(" + current.getNumber() + ") " + current.getAddress() + "\u001B[0m");
 
             double[] coordinate = getBaseCoordinate(current.getAddress());
             if (coordinate == null) {
                 System.out.println("Адрес не найден! Надо геокодировать...");
-                coordinate = parseJsonAndGetLatLon(connectionToDaData(current.getAddress()));
+                String address = current.getAddress();
+                coordinate = parseJsonAndGetLatLon(connectionToDaData(cleanAddress(address)));
             }
             allCoordinates.add(coordinate);
 

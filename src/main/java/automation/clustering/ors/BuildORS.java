@@ -1,4 +1,4 @@
-package automation.clustering.json;
+package automation.clustering.ors;
 
 import automation.clustering.excel.ExcelReadCountDrivers;
 import automation.clustering.model.DeliveryPoint;
@@ -11,6 +11,9 @@ import java.util.List;
 
 import static automation.clustering.optimization.RouteOptimizationService.API_KEY;
 import static automation.clustering.optimization.RouteOptimizationService.filepath;
+import static automation.clustering.ors.CreateStringBuilder.getStringBuilder;
+import static automation.clustering.ors.CreateStringBuilder.getStringBuilderBMM;
+
 
 public class BuildORS {
     static final int MAX_POINTS_PER_DRIVER = 8;
@@ -27,8 +30,8 @@ public class BuildORS {
                 excelCell;
         System.out.println("neededVehicle: " + neededVehicles);
 
-        StringBuilder jobs = CreateStringBuilder.getStringBuilder(coordinates, weights);
-        StringBuilder vehicles = CreateStringBuilder.getStringBuilderBMM(neededVehicles);
+        StringBuilder jobs = getStringBuilder(coordinates, weights);
+        StringBuilder vehicles = getStringBuilderBMM(neededVehicles);
 
         return """
         {

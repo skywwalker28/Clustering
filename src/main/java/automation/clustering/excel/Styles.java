@@ -64,29 +64,9 @@ public class Styles {
     }
 
 
-
-    static double calculateSegmentTime(double segmentDistanceMeters) {
-        double averageSpeedKm = 40.0;
-        double distanceKm = segmentDistanceMeters / 1000;
-        double timeHours = distanceKm / averageSpeedKm;
-        double timeMinutes = timeHours * 60;
-        return Math.round(timeMinutes);
-    }
-
     public static XSSFColor createColor(String hexColor) {
         Color awtColor = Color.decode(hexColor);
         byte[] rgb = new byte[]{(byte) awtColor.getRed(), (byte) awtColor.getGreen(), (byte) awtColor.getBlue()};
         return new XSSFColor(rgb, null);
-    }
-
-    static String calculateTime(double minutes) {
-        double diff = minutes / 60.0;
-
-        int hours = (int) diff;
-        double residue = diff % 1;
-
-        int residueMin = (int) (residue * 60);
-
-        return hours != 0 ? hours + "ч " + residueMin + " мин" : (int) minutes + " мин";
     }
 }

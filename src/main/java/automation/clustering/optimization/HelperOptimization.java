@@ -1,5 +1,6 @@
 package automation.clustering.optimization;
 
+import automation.clustering.wrapper.CoordinateWrapper;
 import automation.clustering.model.DeliveryPoint;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -9,23 +10,22 @@ import java.util.*;
 
 public class HelperOptimization {
 
-    public static Map<String, DeliveryPoint> getRelationship(
+    public static Map<CoordinateWrapper, DeliveryPoint> getRelationship(
             List<double[]> coordinates, List<DeliveryPoint> points) {
 
-        Map<String, DeliveryPoint> result = new HashMap<>();
+        Map<CoordinateWrapper, DeliveryPoint> result = new HashMap<>();
 
         for (int i = 0; i < coordinates.size(); i++) {
             double[] lat_lon = coordinates.get(i);
 
             if (lat_lon == null) continue;
-            result.put(String.format("[%.6f, %.6f]", lat_lon[0], lat_lon[1]), points.get(i));
+            result.put(new CoordinateWrapper(lat_lon), points.get(i));
         }
-
         return result;
     }
 
     public static void parseORSResponse(
-            String response, Map<String, DeliveryPoint> pc,
+            String response, Map<CoordinateWrapper, DeliveryPoint> cp,
             Map<Integer,List<DeliveryPoint>> dp, Map<Integer, List<double[]>> dc) {
 
         JsonObject root = JsonParser.parseString(response).getAsJsonObject();
@@ -48,7 +48,7 @@ public class HelperOptimization {
                     JsonArray location = step.getAsJsonArray("location");
                     double[] lat_lon = {location.get(1).getAsDouble(), location.get(0).getAsDouble()};
 
-                    points.add(pc.get(String.format("[%.6f, %.6f]", lat_lon[0], lat_lon[1])));
+                    points.add(cp.get(new CoordinateWrapper(lat_lon)));
                     coordinates.add(lat_lon);
                 }
             }

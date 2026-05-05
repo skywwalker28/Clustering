@@ -1,9 +1,8 @@
-package automation.clustering.json;
+package automation.clustering.ors;
 
 import automation.clustering.model.DeliveryPoint;
 
 import java.util.List;
-import static automation.clustering.drivers.CreateDrivers.ownCreateDrivers;
 
 public class CreateStringBuilder {
     private static final int MAX_WEIGHT = 550;
@@ -24,7 +23,8 @@ public class CreateStringBuilder {
                 {
                   "id": %d,
                   "location": [%f, %f],
-                  "delivery": [%d, 1]
+                  "amount": [%d, 1],
+                  "service": 900
                 }
                 """.formatted(
                     i,
@@ -55,9 +55,9 @@ public class CreateStringBuilder {
             if (i < neededVehicles - 1) vehicles.append(",");
         }
 
-//        vehicles.append(ownCreateDrivers(0, 1000, 10, "driving-car"));
-//        vehicles.append(",").append(ownCreateDrivers(1, 600, 10, "driving-car"));
-//        vehicles.append(",").append(ownCreateDrivers(2, 350, 10, "driving-car"));
+//        vehicles.append(ownCreateDrivers(0, 340, 10, "driving-car"));
+//        vehicles.append(",").append(ownCreateDrivers(1, 412, 10, "driving-car"));
+//        vehicles.append(",").append(ownCreateDrivers(2, 292, 10, "driving-car"));
 
         System.out.println(vehicles);
         return vehicles;

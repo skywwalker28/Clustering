@@ -1,6 +1,5 @@
 package automation.clustering.excel;
 
-import automation.clustering.distance.RouteDistance;
 import automation.clustering.model.DeliveryPoint;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -10,10 +9,11 @@ import java.io.FileOutputStream;
 import java.util.List;
 import java.util.Map;
 
+import static automation.clustering.distance.OrsDistance.getRouteDistanceFromAPI;
+import static automation.clustering.distance.Calculate.calculateTime;
+
 
 public class ExcelExporter {
-
-
     public static void exportToExcelSingleSheet(
             String filepath,
             Map<Integer, List<DeliveryPoint>> driverAndPoint,
@@ -86,23 +86,27 @@ public class ExcelExporter {
                 List<double[]> segment = (i != 0) ? List.of(coordinates.get(i - 1), coordinates.get(i))
                         : List.of(new double[]{55.592605, 37.747183}, coordinates.get(i));
 
-                double segmentDistance = RouteDistance.getRouteDistance(segment);
-                totalDistance += segmentDistance;
-                double segmentTime = Styles.calculateSegmentTime(segmentDistance);
+                double[] distanceAndDuration = getRouteDistanceFromAPI(segment);
 
-                Cell segmentCell = row.createCell(3);
-                segmentCell.setCellValue((int) (segmentDistance / 1000));
-                segmentCell.setCellStyle(centerText);
+                double segmentDistance = distanceAndDuration[0];
+                double segmentTime = distanceAndDuration[1];
 
+                totalDistance += distanceAndDuration[0];
                 totalTime += segmentTime + 15 + 10;
 
+                Cell segmentCell = row.createCell(3);
+
+                if (segmentDistance / 1000 > 0) segmentCell.setCellValue((int) (segmentDistance / 1000));
+                else segmentCell.setCellValue((int) (segmentDistance));
+                segmentCell.setCellStyle(centerText);
+
                 Cell timeToPointCell = row.createCell(4);
-                timeToPointCell.setCellValue(segmentTime);
+                timeToPointCell.setCellValue((int) segmentTime + 15 + 10);
                 timeToPointCell.setCellStyle(centerText);
             }
 
             String[] totalHeaders = {"", "", totalWeights + " кг",
-                    String.format("%.0f", totalDistance / 1000) + " км", Styles.calculateTime(totalTime)};
+                    String.format("%.0f", totalDistance / 1000) + " км", calculateTime(totalTime)};
 
             Row totalRow = sheet.createRow(currentRow++);
             sheet.addMergedRegion(new CellRangeAddress(totalRow.getRowNum(),
