@@ -1,9 +1,12 @@
 package automation.clustering.model;
 
+import lombok.Data;
+
+@Data
 public class DeliveryPoint {
-    private final String address;
-    private final int weightKg;
-    private final int number;
+    private String address;
+    private int weightKg;
+    private int number;
     private double lat;
     private double lon;
 
@@ -15,29 +18,11 @@ public class DeliveryPoint {
         this.lon = 0.0;
     }
 
-    public String getAddress() {
-        return address;
-    }
-    public int getWeightKg() {
-        return weightKg;
-    }
-    public int getNumber() {
-        return number;
-    }
-
-    public double getLat() {
-        return lat;
-    }
-
-    public double getLon() {
-        return lon;
-    }
-
-    public void setLat(double lat) {
+    public DeliveryPoint(String address, int weightKg, int number, double lat, double lon) {
+        this.address = address;
+        this.weightKg = weightKg;
+        this.number = number;
         this.lat = lat;
-    }
-
-    public void setLon(double lon) {
         this.lon = lon;
     }
 }

@@ -1,6 +1,7 @@
 package automation.clustering.excel;
 
 import automation.clustering.model.DeliveryPoint;
+import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -13,6 +14,7 @@ import java.util.List;
 
 public class ExcelReader {
     public static List<DeliveryPoint> readDeliveryPointsFromExcel(String filePath) throws Exception {
+        ZipSecureFile.setMinInflateRatio(0.001);
         List<DeliveryPoint> points = new ArrayList<>();
 
         try (FileInputStream fis = new FileInputStream(filePath); Workbook workbook = new XSSFWorkbook(fis)) {
