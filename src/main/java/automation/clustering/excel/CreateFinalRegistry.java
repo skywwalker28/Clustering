@@ -45,6 +45,7 @@ public class CreateFinalRegistry {
                 Sheet newSheet = newWorkbook.createSheet("ИМТЭК");
 
                 Row newHeader = newSheet.createRow(0);
+                newHeader.setHeightInPoints(30);
                 copyRowWithExactStyle(originalWorkbook, newWorkbook, headerRow, newHeader,
                         -1, null, null, false);
 
@@ -70,6 +71,11 @@ public class CreateFinalRegistry {
                         Row originalRow = orderNumberToRow.get(point.getNumber());
 
                         Row newRow = newSheet.createRow(targetRowNum++);
+
+                        // --- ЗАДАЕМ ФИКСИРОВАННУЮ ВЫСОТУ СТРОКИ ---
+                        // Стандартная высота в Excel обычно около 15. Мы ставим 45 для просторности.
+                        newRow.setHeightInPoints(65);
+
                         boolean isFirst = (point == points.get(0));
 
                         if (originalRow != null)
@@ -95,14 +101,14 @@ public class CreateFinalRegistry {
 
                             Cell cellPallets = newRow.getCell(6);
                             cellPallets.setBlank();
-                            cellPallets.setCellValue((double) point.getWeightKg() /500);
+                            cellPallets.setCellValue((double) point.getWeightKg() / 500);
 
                             Cell cellWeight = newRow.getCell(7);
                             cellWeight.setCellValue(point.getWeightKg());
                         }
                     }
 
-                    int endRow = targetRowNum -  1;
+                    int endRow = targetRowNum - 1;
                     driverRanges.add(new int[]{startRow, endRow});
                 }
 
@@ -114,9 +120,16 @@ public class CreateFinalRegistry {
                     }
                 }
 
+                // Умеренная ширина колонок, чтобы текст не был слишком сжат
                 for (int i = 0; i <= 16; i++) {
-                    if (originalSheet.getColumnWidth(i) >= 0) {
-                        newSheet.setColumnWidth(i, originalSheet.getColumnWidth(i));
+                    int originalWidth = originalSheet.getColumnWidth(i);
+                    // Расширяем колонку с адресом (индекс 2), чтобы туда влезало больше текста на строку
+                    if (i == 2) {
+                        newSheet.setColumnWidth(i, Math.max(originalWidth, 45 * 256));
+                    } else if (i >= 10 && i <= 12) {
+                        newSheet.setColumnWidth(i, Math.max(originalWidth, 25 * 256));
+                    } else {
+                        newSheet.setColumnWidth(i, Math.max(originalWidth, 18 * 256));
                     }
                 }
 
@@ -124,7 +137,7 @@ public class CreateFinalRegistry {
                     newWorkbook.write(fos);
                 }
 
-                System.out.println("Excel сохранён (точная копия с цветами водителей): " + outputFilePath);
+                System.out.println("Excel сохранён (высокие ячейки с выравниванием): " + outputFilePath);
             }
         }
     }
@@ -152,6 +165,10 @@ public class CreateFinalRegistry {
 
                 newStyle.cloneStyleFrom(sourceStyle);
                 newStyle.setDataFormat(sourceStyle.getDataFormat());
+
+                // --- ЦЕНТРИРУЕМ ТЕКСТ ПО ВЕРТИКАЛИ И РАЗРЕШАЕМ ПЕРЕНОС ---
+                newStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+                newStyle.setWrapText(true); // Чтобы длинные адреса переносились на новую строку внутри ячейки
 
                 XSSFColor sourceFillColor = sourceStyle.getFillForegroundColorColor();
                 if (sourceFillColor != null) {

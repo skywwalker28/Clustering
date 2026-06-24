@@ -12,7 +12,7 @@ import java.util.List;
 
 import static automation.clustering.distance.CreateStringBuilder.createJsonBuilder;
 import static automation.clustering.distance.Calculate.calculateApproximateDistance;
-import static automation.clustering.optimization.RouteOptimizationService.API_KEY;
+import static automation.clustering.main.RouteOptimizationService.API_KEY;
 
 public class OrsDistance {
 

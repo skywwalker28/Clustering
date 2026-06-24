@@ -1,21 +1,23 @@
-package automation.clustering.optimization;
+package automation.clustering.main;
 
+import automation.clustering.algorithm.KMeansAlgorithm;
 import automation.clustering.wrapper.CoordinateWrapper;
-import automation.clustering.excel.ExcelExporter;
-import automation.clustering.excel.ExcelReader;
 import automation.clustering.model.DeliveryPoint;
 import org.springframework.stereotype.Service;
 import java.util.*;
 
 import static automation.clustering.geocoding.ConnectDaData.dotenv;
 import static automation.clustering.ors.BuildORS.buildORSOptimizationJson;
-import static automation.clustering.path.GetPath.getPathToLatestFile;
 import static automation.clustering.ors.BuildORS.sendORSRequest;
+import static automation.clustering.path.GetPath.getPathToLatestFile;
 import static automation.clustering.geocoding.GeocodingAddresses.getCoordinates;
-import static automation.clustering.optimization.HelperOptimization.getRelationship;
-import static automation.clustering.optimization.HelperOptimization.parseORSResponse;
-import static automation.clustering.optimization.CleanAddress.cleanAddress;
+import static automation.clustering.main.HelperOptimization.getRelationship;
+import static automation.clustering.main.HelperOptimization.parseORSResponse;
+import static automation.clustering.main.CleanAddress.cleanAddress;
 import static automation.clustering.map.RouteMapExporter.exportHtmlMap;
+import static automation.clustering.map.RouteMapExporterHandle.exportHtmlMap;
+import static automation.clustering.excel.ExcelReader.readDeliveryPointsFromExcel;
+
 
 @Service
 public class RouteOptimizationService {
@@ -23,24 +25,34 @@ public class RouteOptimizationService {
     public static final String API_KEY = dotenv.get("API_ORS");
     public static final String filepath = getPathToLatestFile();
 
+
+    Shutdown shutdown;
+    RouteOptimizationService(Shutdown shutdown) { this.shutdown = shutdown; }
+
     public void optimizeAndDisplayRoutes() {
 
-        Map<Integer, List<DeliveryPoint>> driverAndPoints = new HashMap<>();
+        Map<Integer, List<DeliveryPoint>> driverAndPoints;
         Map<Integer, List<double[]>> driverAndCoordinate = new HashMap<>();
 
         System.out.println("\n");
 
         try {
             System.out.println("Excel file: " + filepath);
-            List<DeliveryPoint> points = ExcelReader.readDeliveryPointsFromExcel(filepath);
+            List<DeliveryPoint> points = readDeliveryPointsFromExcel(filepath);
             List<double[]> coordinates = getCoordinates(points);
 
             Map<CoordinateWrapper, DeliveryPoint> coordinateAndPoint = getRelationship(coordinates, points);
 
-            String requestJson = buildORSOptimizationJson(coordinates, points);
+/*            String requestJson = buildORSOptimizationJson(coordinates, points);
             String response = sendORSRequest(requestJson);
 
-            parseORSResponse(response, coordinateAndPoint, driverAndPoints, driverAndCoordinate);
+            if (response == null) {
+                exportHtmlMap(points, "map.html");
+                return;
+            }
+
+            parseORSResponse(response, coordinateAndPoint, driverAndPoints, driverAndCoordinate);*/
+            driverAndPoints = KMeansAlgorithm.cluster(points, 3, 10);
             exportHtmlMap(driverAndPoints, "map.html");
 
             int totalPoints = 0;
@@ -58,10 +70,10 @@ public class RouteOptimizationService {
             }
 
             System.out.println("\nВсего распределенно точек: " + totalPoints + "/" + coordinates.size());
-            ExcelExporter.exportToExcelSingleSheet("Реестр(Java).xlsx", driverAndPoints, driverAndCoordinate);
 
         } catch (Exception e) {
             System.err.println("Error in RouteOptimizationService: " + e.getMessage());
+            shutdown.stopApplication(1);
         }
     }
 }

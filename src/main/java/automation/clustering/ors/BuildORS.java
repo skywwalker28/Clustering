@@ -1,33 +1,31 @@
 package automation.clustering.ors;
 
-import automation.clustering.excel.ExcelReadCountDrivers;
 import automation.clustering.model.DeliveryPoint;
+import lombok.Setter;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
+import java.time.Duration;
 import java.util.List;
 
-import static automation.clustering.optimization.RouteOptimizationService.API_KEY;
-import static automation.clustering.optimization.RouteOptimizationService.filepath;
-import static automation.clustering.ors.CreateStringBuilder.getStringBuilder;
-import static automation.clustering.ors.CreateStringBuilder.getStringBuilderBMM;
+import static automation.clustering.main.RouteOptimizationService.API_KEY;
+import static automation.clustering.ors.CreateDrivers.getStringBuilder;
+import static automation.clustering.ors.CreateDrivers.getStringBuilderBMM;
 
 
 public class BuildORS {
     static final int MAX_POINTS_PER_DRIVER = 8;
-    static final int MAX_VEHICLES = 5;
-    static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+
+    @Setter
+    private static HttpClient httpClient = HttpClient.newHttpClient();
 
 
     public static String buildORSOptimizationJson(List<double[]> coordinates, List<DeliveryPoint> weights) {
-        ExcelReadCountDrivers countDrivers = new ExcelReadCountDrivers();
-        int excelCell = countDrivers.getDriverCount(filepath);
 
-        int neededVehicles = excelCell == 0 || excelCell > 3 ?
-                Math.min((int) Math.ceil((double) coordinates.size() / MAX_POINTS_PER_DRIVER), MAX_VEHICLES) :
-                excelCell;
+        int neededVehicles = Math.min((int) Math.ceil((double) coordinates.size() / MAX_POINTS_PER_DRIVER), 3);
         System.out.println("neededVehicle: " + neededVehicles);
 
         StringBuilder jobs = getStringBuilder(coordinates, weights);
@@ -36,14 +34,9 @@ public class BuildORS {
         return """
         {
           "jobs": [%s],
-          "vehicles": [%s],
-          "options": {
-            "min_vehicles": %d,
-            "max_vehicles": %d,
-            "gzip": false
-          }
+          "vehicles": [%s]
         }
-        """.formatted(jobs, vehicles, neededVehicles, neededVehicles);
+        """.formatted(jobs, vehicles);
     }
 
     public static String sendORSRequest(String json) throws Exception {
@@ -51,13 +44,19 @@ public class BuildORS {
                 .uri(URI.create("https://api.openrouteservice.org/optimization"))
                 .header("Authorization", API_KEY)
                 .header("Content-Type", "application/json")
+                .timeout(Duration.ofSeconds(15))
                 .POST(HttpRequest.BodyPublishers.ofString(json))
                 .build();
-        HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 200) {
-            throw new RuntimeException("ORS API returned code " + response.statusCode() + ": " + response.body());
-        }
 
-        return response.body();
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("ORS API returned code " + response.statusCode() + ": " + response.body());
+            }
+            return response.body();
+        } catch (HttpTimeoutException e) {
+            System.out.println("15 секунд не можем достучатся до ors сервиса");
+            return null;
+        }
     }
 }

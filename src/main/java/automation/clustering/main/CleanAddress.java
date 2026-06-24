@@ -1,4 +1,4 @@
-package automation.clustering.optimization;
+package automation.clustering.main;
 
 public class CleanAddress {
     public static String cleanAddress(String address) {

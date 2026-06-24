@@ -9,7 +9,7 @@ import java.util.List;
 import static automation.clustering.geocoding.ConnectDaData.connectionToDaData;
 import static automation.clustering.geocoding.GetLatLon.parseJsonAndGetLatLon;
 import static automation.clustering.addresses.BaseCoordinates.getBaseCoordinate;
-import static automation.clustering.optimization.CleanAddress.cleanAddress;
+import static automation.clustering.main.CleanAddress.cleanAddress;
 
 public class GeocodingAddresses {
 

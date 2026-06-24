@@ -2,10 +2,7 @@ package automation.clustering.excel;
 
 import automation.clustering.model.DeliveryPoint;
 import org.apache.poi.openxml4j.util.ZipSecureFile;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.FileInputStream;
@@ -19,10 +16,16 @@ public class ExcelReader {
 
         try (FileInputStream fis = new FileInputStream(filePath); Workbook workbook = new XSSFWorkbook(fis)) {
             Sheet sheet = workbook.getSheetAt(0);
+            Row firstRow = sheet.getRow(0);
             int lastIndex = sheet.getLastRowNum();
 
-            for (int i = 1; i <= lastIndex; i++) {
+            int i;
+            Cell firstCell = firstRow.getCell(0);
 
+            if (firstCell == null || firstCell.getCellType() == CellType.BLANK) i = 2;
+            else i = 1;
+
+            for (; i <= lastIndex; i++) {
                 Row row = sheet.getRow(i);
                 if (row == null) {
                     System.out.println("row is null");
@@ -33,11 +36,7 @@ public class ExcelReader {
                 Cell addressCell = row.getCell(2);
                 Cell weightCell = row.getCell(7);
 
-
-                if (addressCell == null || weightCell == null) {
-                    System.out.println("addressCell is null || weightCell is null");
-                    continue;
-                }
+                if (numberCell == null || addressCell == null || weightCell == null) continue;
 
                 String rawAddress = addressCell.getStringCellValue().trim();
 

@@ -1,4 +1,4 @@
-package automation.clustering.optimization;
+package automation.clustering.main;
 
 import automation.clustering.wrapper.CoordinateWrapper;
 import automation.clustering.model.DeliveryPoint;

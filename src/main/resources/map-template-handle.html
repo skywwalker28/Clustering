@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>Manual Route Clustering</title>
+
+    <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css" rel="stylesheet"/>
+
+    <style>
+        body { margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        #map { width: 100%; height: 100vh; }
+        .marker {
+            cursor: grab; width: 32px; height: 32px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: transform 0.1s ease; user-select: none; -webkit-user-select: none;
+        }
+        .marker:active { cursor: grabbing; }
+        .marker.dragging { opacity: 0.5; transform: scale(1.15); cursor: grabbing; z-index: 1000; }
+        .marker.drop-zone { box-shadow: 0 0 0 3px gold, 0 2px 4px rgba(0,0,0,0.3); transform: scale(1.1); }
+        .label {
+            background: white; border: 1px solid #333; padding: 1px 4px; border-radius: 3px;
+            font-size: 10px; font-weight: bold; transform: translateY(-28px); white-space: nowrap;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15); pointer-events: none;
+        }
+        .panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 12px 14px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+            font-family: Arial;
+            font-size: 14px;
+            z-index: 1000;
+            max-height: 80vh;
+            overflow-y: auto;
+            width: 350px;
+            min-width: unset;
+        }
+        .driver-stats { margin-top: 8px; padding: 8px; border-top: 1px solid #ddd; border-radius: 6px; transition: background 0.2s; }
+        .driver-stats:hover { background: #f5f5f5; }
+        .driver-name { font-weight: bold; margin-bottom: 4px; }
+        button { margin-top: 10px; padding: 8px 12px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 4px; width: 100%; }
+        button:hover { background: #45a049; }
+        select { width: 100%; margin-top: 6px; padding: 6px; }
+        .left-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 1000;
+            width: 130px;
+            font-size: 17px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            font-weight: bolder;
+
+        }
+
+        .driver-item {
+            padding: 6px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .driver-item:hover {
+            background: #f0f0f0;
+        }
+        .driver-item.active {
+            background: #d0ebff;
+        }
+
+        @media (max-width: 768px) {
+            .panel { font-size: 12px; min-width: 260px; }
+            .marker { width: 28px; height: 28px; font-size: 11px; }
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="map"></div>
+<div id="driver-panel" class="left-panel"></div>
+<div class="panel">
+    <h3 style="margin-top:0; margin-bottom: 12px; font-size: 30px">Ручная кластеризация</h3>
+
+    <div style="margin-bottom: 16px; font-size: 20px; font-weight: bold">
+        Количество водителей:
+        <select id="driverCount" style="width: auto; font-size: 16px; display: inline-block;" onchange="generateDrivers()">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+        </select>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #ddd; margin: 16px 0;">
+    <div id="driver-selectors"></div>
+    <hr style="border: 0; border-top: 1px solid #ddd; margin: 16px 0;">
+    <div id="stats"></div>
+
+    <button onclick="exportToServerExcel()" style="background: #007bff; margin-top: 15px; font-weight: bold;">
+        Экспортировать Excel-файл
+    </button>
+
+    <button onclick="resetState()" style="background:#dc3545;">Сбросить маршруты</button>
+</div>
+
+<script>
+    const bmm = __BMM_COORDS__;
+    const DRIVER_INFO_LIST = __DRIVER_INFO_LIST__;
+    const allPoints = __ALL_POINTS__;
+
+    const DISTANCE_COEFFICIENT = __DISTANCE_COEFFICIENT__;
+    const AVG_SPEED = __AVG_SPEED__;
+    const UNLOADING_TIME = __UNLOADING_TIME__;
+    const MANEUVER_TIME = __MANEUVER_TIME__;
+
+    const DRIVER_COLORS = ["#00aa00", "#ff0000", "#0000ff", "#ff9900", "#9900cc"];
+
+    let map;
+    let drivers = [];
+    let markers = [];
+    let freePointMarkers = [];
+    let draggedMarker = null;
+    let draggedDriverIdx = null;
+    let draggedPointIdx = null;
+    let isDragging = false;
+    let unassignedPoints = [];
+    let selectedDriverFilter = null;
+
+    const BACKEND_URL = "http://localhost:8080";
+
+    function exportToServerExcel() {
+        const driversPayload = drivers.map(d => ({
+            points: d.points.map(p => ({
+                number: p.num,
+                weightKg: p.weight,
+                address: p.address,
+                lat: p.coords[1],
+                lon: p.coords[0]
+            }))
+        }));
+
+        const assignmentsPayload = [];
+        const selects = document.querySelectorAll('#driver-selectors select');
+
+        selects.forEach(select => {
+            const driverIndex = parseInt(select.getAttribute('data-driver-idx'));
+            const infoIdx = parseInt(select.value);
+            const rawInfo = DRIVER_INFO_LIST[infoIdx];
+
+            if (rawInfo) {
+                assignmentsPayload.push({
+                    driverIndex: driverIndex,
+                    driverData: {
+                        vehicleNumber: rawInfo.vehicleNumber,
+                        driverName: rawInfo.driverName,
+                        phone: rawInfo.phone,
+                        carrier: rawInfo.carrier,
+                        tariff: rawInfo.tariff
+                    }
+                });
+            }
+        });
+
+        const payload = {
+            drivers: driversPayload,
+            driverAssignments: assignmentsPayload
+        };
+
+        fetch(`${BACKEND_URL}/save-routes2`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        })
+            .then(response => {
+                if (!response.ok) throw new Error('Ошибка сохранения маршрутов на сервере');
+                return response.text();
+            })
+            .then(message => {
+                alert('Успех: ' + message)
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Не удалось экспортировать Excel: ' + err.message);
+            });
+    }
+
+    function updateDriverSelect() {
+        const container = document.getElementById('driver-selectors');
+        if (!container) return;
+        container.innerHTML = '<h5 style="margin: 8px 0 8px 0; font-size: 20px"> Назначение водителей </h5>';
+
+        drivers.forEach((driver, idx) => {
+            const selectorDiv = document.createElement('div');
+            selectorDiv.style.marginBottom = '8px';
+            selectorDiv.style.fontSize = '12px';
+
+            const colorSpan = '<span style="display:inline-block;width:10px;height:10px;background:' + driver.color +
+                ';border-radius:50%;margin-right:6px;"></span>';
+
+            let options = '';
+            DRIVER_INFO_LIST.forEach((info, infoIdx) => {
+                const selected = (idx === infoIdx) ? 'selected' : '';
+                // Изменено: теперь info - это объект
+                let parts = info.driverName.split(' ');
+                let name = parts.length > 1 ? parts[1] + ' ' + parts[0] : info.driverName;
+                options += '<option value="' + infoIdx + '" ' + selected + '>' + name + '</option>';
+            });
+
+            selectorDiv.innerHTML = colorSpan + '<strong style="font-size: 18px">' + driver.name + '</strong>' +
+                '<select data-driver-idx="' + idx + '" style="width:100%; margin-top:4px; padding:4px; font-size:14px;">' +
+                options +
+                '</select>';
+
+            container.appendChild(selectorDiv);
+        });
+    }
+
+    function generateDrivers() {
+        const newCount = parseInt(document.getElementById('driverCount').value);
+        const currentCount = drivers.length;
+
+        if (currentCount === 0) {
+            unassignedPoints = [];
+            for (let i = 0; i < newCount; i++) {
+                drivers.push({ name: "Водитель " + (i + 1), color: DRIVER_COLORS[i], points: [] });
+            }
+            for (let i = 0; i < newCount; i++) {
+                if (allPoints[i]) drivers[i].points.push(allPoints[i]);
+            }
+            for (let i = newCount; i < allPoints.length; i++) {
+                unassignedPoints.push(allPoints[i]);
+            }
+            redrawAll();
+            renderDriverPanel();
+            return;
+        }
+
+        if (newCount > currentCount) {
+            for (let i = currentCount; i < newCount; i++) {
+                const newDriver = { name: "Водитель " + (i + 1), color: DRIVER_COLORS[i], points: [] };
+                if (unassignedPoints.length > 0) {
+                    newDriver.points.push(unassignedPoints.shift());
+                } else {
+                    for (let d = 0; d < drivers.length; d++) {
+                        if (drivers[d].points.length > 0) {
+                            newDriver.points.push(drivers[d].points.pop());
+                            break;
+                        }
+                    }
+                }
+                drivers.push(newDriver);
+            }
+        } else if (newCount < currentCount) {
+            while (drivers.length > newCount) {
+                const removedDriver = drivers.pop();
+                removedDriver.points.forEach(point => unassignedPoints.push(point));
+            }
+
+            if (selectedDriverFilter !== null && selectedDriverFilter >= newCount) {
+                selectedDriverFilter = null;
+            }
+        }
+
+        redrawAll();
+        renderDriverPanel();
+    }
+
+    function calculateHaversineDistance(point1, point2) {
+        const R = 6371000;
+        const lat1 = point1[1] * Math.PI / 180;
+        const lat2 = point2[1] * Math.PI / 180;
+        const dLat = (point2[1] - point1[1]) * Math.PI / 180;
+        const dLon = (point2[0] - point1[0]) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    function calculateRouteDistance(driver) {
+        if (driver.points.length === 0) return 0;
+        let totalDistance = 0;
+        let prevCoords = bmm;
+        for (let i = 0; i < driver.points.length; i++) {
+            const currentCoords = driver.points[i].coords;
+            totalDistance += calculateHaversineDistance(prevCoords, currentCoords) * DISTANCE_COEFFICIENT;
+            prevCoords = currentCoords;
+        }
+        return totalDistance;
+    }
+
+    function calculateTimeBetween(point1, point2) {
+        const distance = calculateHaversineDistance(point1, point2) / 1000;
+        const timeMinutes = (distance / AVG_SPEED) * 60;
+        return (timeMinutes + UNLOADING_TIME + MANEUVER_TIME);
+    }
+
+    function calculateDriverStats(driver) {
+        const totalWeight = driver.points.reduce((sum, p) => sum + (p.weight || 0), 0);
+        if (driver.points.length === 0) return { totalWeight, totalTime: 0, totalDistance: 0 };
+
+        let totalTime = 60;
+        let prevCoords = bmm;
+        for (let i = 0; i < driver.points.length; i++) {
+            const currentCoords = driver.points[i].coords;
+            totalTime += calculateTimeBetween(prevCoords, currentCoords) + 10;
+            prevCoords = currentCoords;
+        }
+        return { totalWeight, totalTime, totalDistance: calculateRouteDistance(driver) };
+    }
+
+    function updateStats() {
+        const statsDiv = document.getElementById('stats');
+        let html = '';
+
+        const totalPoints = drivers.reduce((sum, d) => sum + d.points.length, 0) + unassignedPoints.length;
+        const totalWeightAll = drivers.reduce((sum, d) => sum + calculateDriverStats(d).totalWeight, 0) +
+            unassignedPoints.reduce((sum, p) => sum + (p.weight || 0), 0);
+        const totalDistanceAll = drivers.reduce((sum, d) => sum + calculateRouteDistance(d), 0) / 1000;
+
+        drivers.forEach((driver, driverIndex) => {
+            const stats = calculateDriverStats(driver);
+            const hours = Math.floor(stats.totalTime / 60);
+            const minutes = Math.round(stats.totalTime % 60);
+            const distanceKm = stats.totalDistance / 1000;
+
+            html += '<div class="driver-stats" style="border: 1px solid #eee; font-size: 18px; padding: 10px; margin-bottom: 8px; border-radius: 6px;">' +
+                '<div class="driver-name">' +
+                '<span style="display:inline-block;width:12px;height:12px;background:' + driver.color + '; border-radius:50%;margin-right:8px;"></span>' +
+                driver.name +
+                '<div> Точек: ' + driver.points.length + '</div>' +
+                '<div> Вес: ' + stats.totalWeight + ' кг</div>' +
+                '<div> Дистанция: ' + (stats.totalDistance < 1000 ? Math.round(stats.totalDistance) + ' м' : distanceKm.toFixed(1) + ' км') + '</div>' +
+                '<div> Время: ' + hours + ' ч ' + minutes + ' мин</div>' +
+                '<select id="pointSelect_' + driverIndex + '" style="width: 100%; margin-top: 5px;">' +
+                '<option value="">Добавить точку...</option>';
+
+            // ВАЖНО: теперь allPoints содержит ВСЕ точки, переданные из Java
+            allPoints.forEach(point => {
+                html += '<option value="' + point.num + '">' + point.num + ' — ' + point.address + '</option>';
+            });
+
+            html += '</select>' +
+                '<button style="background:' + driver.color + '; color: white; border: none; padding: 4px 8px; margin-top: 5px; width: 100%; cursor: pointer; border-radius: 4px;" onclick="addPointToDriver(' + driverIndex + ')">' +
+                'Добавить точку</button>' +
+                '</div>';
+        });
+
+        html += '<div style="margin-top:12px; padding-top:8px; border-top:2px solid #ddd; font-size: 18px; font-weight: bold;">' +
+            '<strong>Итого:</strong><br>📍 ' + totalPoints + ' точек &nbsp;|&nbsp; ' +
+            totalWeightAll + ' кг &nbsp;|&nbsp; ' + (totalDistanceAll < 10 ? totalDistanceAll.toFixed(1) + ' км' : Math.round(totalDistanceAll) + ' км') + '</div>';
+        statsDiv.innerHTML = html;
+    }
+
+    function redrawAll() {
+        for (let i = 0; i < 20; i++) {
+            if (map.getLayer('route-line-' + i)) map.removeLayer('route-line-' + i);
+            if (map.getSource('route' + i)) map.removeSource('route' + i);
+        }
+
+        markers.forEach(m => { if (m && m.remove) m.remove(); });
+        markers = [];
+
+        freePointMarkers.forEach(m => { if (m && m.remove) m.remove(); });
+        freePointMarkers = [];
+
+        drivers.forEach((driver, index) => {
+            const isHidden = selectedDriverFilter !== null && selectedDriverFilter !== index;
+
+            if (driver.points.length > 0) {
+                const routeCoords = [bmm, ...driver.points.map(p => p.coords)];
+                map.addSource('route' + index, {
+                    type: 'geojson',
+                    data: {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'LineString',
+                            coordinates: routeCoords
+                        }
+                    }
+                });
+
+                map.addLayer({
+                    id: 'route-line-' + index,
+                    type: 'line',
+                    source: 'route' + index,
+                    paint: {
+                        'line-color': driver.color,
+                        'line-width': 3,
+                        'line-opacity': isHidden ? 0 : 0.8
+                    }
+                });
+            }
+
+            driver.points.forEach((point, pointIndex) => {
+                createMarker(point, driver, index, pointIndex, isHidden);
+            });
+        });
+
+        unassignedPoints.forEach((point, unassignedIdx) => {
+            const isHidden = selectedDriverFilter !== null;
+
+            const el = document.createElement('div');
+            el.dataset.unassigned = 'true';
+            el.dataset.pointNum = point.num;
+
+            el.dataset.unassignedIdx = unassignedIdx
+
+            el.className = 'marker';
+            el.innerText = point.num;
+            el.style.backgroundColor = '#777';
+            el.style.color = 'white';
+            el.style.border = '2px solid white';
+
+            if (isHidden) {
+                el.style.display = "none";
+            }
+
+            const startDrag = (e) => {
+                e.preventDefault(); e.stopPropagation();
+                if (isDragging) return;
+                draggedMarker = el;
+
+                draggedDriverIdx = -1;
+                draggedPointIdx = unassignedIdx;
+
+                isDragging = true; el.classList.add('dragging');
+                document.addEventListener('mousemove', onDragMove);
+                document.addEventListener('mouseup', onDragEnd);
+            };
+
+            const onDragMove = (e) => {
+                if (!isDragging || !draggedMarker) return;
+                e.preventDefault();
+                let elements = document.elementsFromPoint(e.clientX, e.clientY);
+                let targetMarker = null;
+                for (let el of elements) {
+                    if (el.classList && el.classList.contains('marker') && el !== draggedMarker) {
+                        targetMarker = el; break;
+                    }
+                }
+                document.querySelectorAll('.marker').forEach(m => m.classList.remove('drop-zone'));
+                if (targetMarker) targetMarker.classList.add('drop-zone');
+            };
+
+            const onDragEnd = (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                draggedMarker.classList.remove('dragging');
+
+                let targetMarker = null;
+                const elements = document.elementsFromPoint(e.clientX, e.clientY);
+                for (let el of elements) {
+                    if (el.classList && el.classList.contains('marker') && el !== draggedMarker) {
+                        targetMarker = el; break;
+                    }
+                }
+
+                if (targetMarker && targetMarker.dataset.driverIdx !== undefined) {
+                    const targetDriverIdx = parseInt(targetMarker.dataset.driverIdx);
+                    const targetPointIdx = parseInt(targetMarker.dataset.pointIdx);
+                    addFreePointToRoute(point.num, targetDriverIdx, targetPointIdx);
+                }
+
+                document.querySelectorAll('.marker').forEach(m => m.classList.remove('drop-zone'));
+                document.removeEventListener('mousemove', onDragMove);
+                document.removeEventListener('mouseup', onDragEnd);
+
+                draggedMarker = null; draggedDriverIdx = null; draggedPointIdx = null; isDragging = false;
+            };
+
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const popup = new maplibregl.Popup({ offset: 25 })
+                    .setLngLat(point.coords)
+                    .setHTML('<div style="font-family: Arial; min-width: 220px; line-height: 1.3">' +
+                        '<strong>📍 Свободная точка ' + point.num + '</strong><br>' +
+                        '<div style="font-size: 11px; margin-top: 3px;">' + (point.address || 'Адрес не указан') + '</div>' +
+                        '<div style="font-size: 10px; color: #666; margin-top: 5px;">Вес: ' + (point.weight || 0) + ' кг<br>📍 ' + point.coords[1].toFixed(5) + ', ' + point.coords[0].toFixed(5) + '</div></div>')
+                    .addTo(map);
+                setTimeout(() => popup.remove(), 30000);
+            });
+
+            el.addEventListener('mousedown', startDrag);
+            const marker = new maplibregl.Marker({ element: el }).setLngLat(point.coords).addTo(map);
+            freePointMarkers.push(marker);
+        });
+
+        updateStats();
+        updateDriverSelect();
+        saveState();
+    }
+
+    function addNewPoint() {
+        const pointNum = parseInt(document.getElementById('newPointNum').value.trim(), 10);
+        const address = document.getElementById('newAddress').value.trim();
+        const coordsRaw = document.getElementById('newCoords').value.trim();
+        const weight = parseFloat(document.getElementById('newWeight').value) || 0;
+
+        if (isNaN(pointNum)) {
+            alert('Пожалуйста, введите числовой номер точки.');
+            return;
+        }
+
+        const isDuplicate = allPoints.some(p => p.num === pointNum);
+        if (isDuplicate) {
+            alert(`Номер ${pointNum} уже занят. Введите другой номер.`);
+            return;
+        }
+
+        if (!address) {
+            alert('Пожалуйста, укажите адрес.');
+            return;
+        }
+
+        const parts = coordsRaw.split(',');
+        if (parts.length !== 2) {
+            alert('Введите координаты через запятую в формате: Широта, Долгота\nПример: 55.726882, 37.579654');
+            return;
+        }
+
+        const lat = parseFloat(parts[0].trim());
+        const lng = parseFloat(parts[1].trim());
+
+        if (isNaN(lat) || isNaN(lng)) {
+            alert('Не удалось распознать числа в координатах. Проверьте формат.');
+            return;
+        }
+
+
+        const newPoint = {
+            num: pointNum,
+            coords: [lng, lat],
+            address: address,
+            weight: weight
+        };
+
+        allPoints.push(newPoint);
+        unassignedPoints.push(newPoint);
+
+        redrawAll();
+        document.getElementById('newPointNum').value = '';
+        document.getElementById('newAddress').value = '';
+        document.getElementById('newCoords').value = '';
+        document.getElementById('newWeight').value = '';
+    }
+
+    function createMarker(point, driver, driverIndex, pointIndex, isHidden) {
+        const el = document.createElement('div');
+        el.className = 'marker';
+        el.innerText = point.num;
+        el.style.backgroundColor = driver.color;
+        el.style.color = 'white';
+        el.style.border = '2px solid white';
+        el.dataset.driverIdx = driverIndex;
+        el.dataset.pointIdx = pointIndex;
+        el.dataset.num = point.num;
+
+        if (isHidden) el.style.display = 'none';
+
+
+        const startDrag = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (isDragging) return;
+            draggedMarker = el;
+            draggedDriverIdx = parseInt(el.dataset.driverIdx);
+            draggedPointIdx = parseInt(el.dataset.pointIdx);
+            isDragging = true;
+            el.classList.add('dragging');
+            document.addEventListener('mousemove', onDragMove);
+            document.addEventListener('mouseup', onDragEnd);
+            document.addEventListener('touchmove', onDragMove, { passive: false });
+            document.addEventListener('touchend', onDragEnd);
+            document.addEventListener('touchcancel', onDragEnd);
+        };
+
+        const onClick = (e) => {
+            e.stopPropagation();
+            const popup = new maplibregl.Popup({ offset: 25 })
+                .setLngLat(point.coords)
+                .setHTML('<div style="font-family: Arial; min-width: 220px; line-height: 1.3">' +
+                    '<strong>📍 Точка ' + point.num + '</strong><br>' +
+                    '<div style="font-size: 11px; margin-top: 3px;">' + (point.address || 'Адрес не указан') + '</div>' +
+                    '<div style="font-size: 10px; color: #666; margin-top: 5px;">' + driver.name + '<br>Вес: ' + (point.weight || 0) + ' кг<br>' + point.coords[1].toFixed(5) + ', ' + point.coords[0].toFixed(5) + '</div></div>')
+                .addTo(map);
+            setTimeout(() => popup.remove(), 30000);
+        };
+
+        const onDragMove = (e) => {
+            if (!isDragging || !draggedMarker) return;
+            e.preventDefault();
+            let elementUnderCursor = document.elementsFromPoint(e.clientX, e.clientY);
+            let targetMarker = null;
+            for (let el of elementUnderCursor) {
+                if (el.classList && el.classList.contains('marker') && el !== draggedMarker) {
+                    targetMarker = el; break;
+                }
+            }
+            document.querySelectorAll('.marker').forEach(m => m.classList.remove('drop-zone'));
+            if (targetMarker) targetMarker.classList.add('drop-zone');
+        };
+
+        const onDragEnd = (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            draggedMarker.classList.remove('dragging');
+            let targetMarker = null;
+            const elements = e.changedTouches ? document.elementsFromPoint(e.changedTouches[0].clientX,
+                e.changedTouches[0].clientY) : document.elementsFromPoint(e.clientX, e.clientY);
+            for (let el of elements) {
+                if (el.classList && el.classList.contains('marker') && el !== draggedMarker) {
+                    targetMarker = el;
+                    break;
+                }
+            }
+            if (targetMarker && draggedMarker) {
+                if (targetMarker.dataset.unassigned === 'true') {
+                    const targetUnassignedIdx = parseInt(targetMarker.dataset.unassignedIdx)
+                    movePoint(draggedDriverIdx, draggedPointIdx, -1, targetUnassignedIdx)
+                } else {
+                    const targetDriverIdx = parseInt(targetMarker.dataset.driverIdx);
+                    let targetPointIdx = parseInt(targetMarker.dataset.pointIdx);
+
+                    if (isNaN(targetPointIdx)) targetPointIdx = -1
+
+                    if (draggedDriverIdx !== undefined && draggedPointIdx !== undefined && draggedDriverIdx !== -1) {
+                        movePoint(draggedDriverIdx, draggedPointIdx, targetDriverIdx, targetPointIdx);
+                    }
+                }
+            }
+            document.querySelectorAll('.marker').forEach(m => m.classList.remove('drop-zone'));
+            document.removeEventListener('mousemove', onDragMove);
+            document.removeEventListener('mouseup', onDragEnd);
+            document.removeEventListener('touchmove', onDragMove);
+            document.removeEventListener('touchend', onDragEnd);
+            document.removeEventListener('touchcancel', onDragEnd);
+            draggedMarker = null;
+            draggedDriverIdx = null;
+            draggedPointIdx = null;
+            isDragging = false;
+        };
+
+        el.addEventListener('mousedown', startDrag);
+        el.addEventListener('click', onClick);
+
+        const marker = new maplibregl.Marker({ element: el }).setLngLat(point.coords).addTo(map);
+        markers.push(marker);
+
+        const label = document.createElement('div');
+        label.className = 'label';
+        label.innerText = point.num;
+        if (isHidden) label.style.display = 'none';
+
+        const labelMarker = new maplibregl.Marker({ element: label, anchor: 'bottom' }).setLngLat(point.coords).addTo(map);
+        markers.push(labelMarker);
+    }
+
+    function movePoint(fromDriverIdx, fromPointIdx, targetDriverIdx, targetPointIdx) {
+        if (fromDriverIdx === targetDriverIdx) {
+            return;
+        }
+
+        const fromDriver = drivers[fromDriverIdx];
+        const targetDriver = drivers[targetDriverIdx];
+
+        if (!targetDriver) {
+            fromDriver.points.splice(fromPointIdx + 1, 0, unassignedPoints[targetPointIdx])
+            unassignedPoints.splice(targetPointIdx, 1)
+
+        } else {
+            const movingPoint = targetDriver.points[targetPointIdx];
+            targetDriver.points.splice(targetPointIdx, 1);
+            fromDriver.points.splice(fromPointIdx + 1, 0, movingPoint);
+        }
+
+        redrawAll();
+    }
+
+    function toggleDriverFilter(driverIdx) {
+        if (selectedDriverFilter === driverIdx) {
+            selectedDriverFilter = null;
+        } else {
+            selectedDriverFilter = driverIdx;
+        }
+
+        renderDriverPanel();
+        redrawAll();
+    }
+
+    function renderDriverPanel() {
+        const panel = document.getElementById("driver-panel");
+        panel.innerHTML = "";
+
+        drivers.forEach((driver, idx) => {
+            const div = document.createElement("div");
+            div.className = "driver-item" + (selectedDriverFilter === idx ? " active" : "");
+
+            div.innerHTML = `
+            <span style="display:inline-block;width:10px;height:10px;background:${driver.color};
+            border-radius:50%;margin-right:6px;"></span>
+            ${driver.name}
+        `;
+
+            div.onclick = () => toggleDriverFilter(idx);
+            panel.appendChild(div);
+        });
+    }
+
+
+    function addFreePointToRoute(pointNum, targetDriverIdx, targetPointIdx) {
+        const pointIndex = unassignedPoints.findIndex(p => p.num === pointNum);
+        if (pointIndex === -1) return;
+
+        const point = unassignedPoints[pointIndex];
+        unassignedPoints.splice(pointIndex, 1);
+        drivers[targetDriverIdx].points.splice(targetPointIdx + 1, 0, point);
+
+        redrawAll();
+    }
+
+    function addFreePointAfterCurrent(driverIdx, pointIdx, freePointNum) {
+        const freePointIndex = unassignedPoints.findIndex(p => p.num === freePointNum);
+        if (freePointIndex === -1) return;
+
+        const freePoint = unassignedPoints[freePointIndex];
+        unassignedPoints.splice(freePointIndex, 1);
+        drivers[driverIdx].points.splice(pointIdx + 1, 0, freePoint);
+
+        redrawAll();
+    }
+
+    function saveState() {
+        const state = {
+            drivers: drivers,
+            unassignedPoints: unassignedPoints,
+            selectedDriverFilter: selectedDriverFilter,
+            driverCount: document.getElementById('driverCount').value
+        };
+        localStorage.setItem('route_clustering_state', JSON.stringify(state));
+    }
+
+    function loadState() {
+        const saved = localStorage.getItem('route_clustering_state');
+        if (!saved) return false;
+        try {
+            const state = JSON.parse(saved);
+            drivers = state.drivers || [];
+            unassignedPoints = state.unassignedPoints || [];
+            selectedDriverFilter = state.selectedDriverFilter !== undefined ? state.selectedDriverFilter : null;
+            if (state.driverCount) {
+                document.getElementById('driverCount').value = state.driverCount;
+            }
+            return true;
+        } catch (e) {
+            console.error("Не удалось восстановить сохраненные маршруты:", e);
+            return false;
+        }
+    }
+
+    function resetState() {
+        localStorage.removeItem('route_clustering_state');
+        location.reload(); // Перезагрузит и подтянет чистые данные с сервера
+    }
+
+    function addPointToDriver(driverIndex) {
+        const select = document.getElementById('pointSelect_' + driverIndex);
+        const pointNum = parseInt(select.value);
+        if (!pointNum) return;
+
+        let selectedPoint = null;
+
+        const freePointIndex = unassignedPoints.findIndex(p => p.num === pointNum);
+        if (freePointIndex !== -1) {
+            selectedPoint = unassignedPoints[freePointIndex];
+            unassignedPoints.splice(freePointIndex, 1);
+        }
+
+        if (!selectedPoint) {
+            for (let i = 0; i < drivers.length; i++) {
+                const pointIndex = drivers[i].points.findIndex(p => p.num === pointNum);
+                if (pointIndex !== -1) {
+                    selectedPoint = drivers[i].points[pointIndex];
+                    drivers[i].points.splice(pointIndex, 1);
+                    break;
+                }
+            }
+        }
+
+        if (!selectedPoint) return;
+
+        drivers[driverIndex].points.push(selectedPoint);
+        redrawAll();
+    }
+
+    map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+        center: [37.61, 55.75],
+        zoom: 9
+    });
+
+    map.on('load', () => {
+        new maplibregl.Marker({ color: "#ffcc00" })
+            .setLngLat(bmm)
+            .setPopup(
+                new maplibregl.Popup().setHTML(
+                    "<strong>🏢 БАЗА (BMM)</strong><br>Отправление всех маршрутов"
+                )
+            )
+            .addTo(map);
+
+        document.getElementById('addNewPointBtn')
+            .addEventListener('click', addNewPoint);
+
+        if (!loadState()) {
+            generateDrivers();
+        } else {
+            redrawAll();
+            renderDriverPanel();
+        }
+    });
+</script>
+<div style="position: absolute; bottom: 20px; left: 10px; z-index: 1000; width: 280px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.25); font-family: Arial, sans-serif;">
+    <h5 style="margin: 0 0 8px 0; font-size: 14px; color: #333; font-weight: bold;">➕ Добавить новую точку</h5>
+    <input type="number" id="newPointNum" placeholder="Номер точки (например, 25)" style="width: 100%; margin-bottom: 6px; padding: 6px; box-sizing: border-box; font-size: 13px;">
+    <input type="text" id="newAddress" placeholder="Адрес (например, ул. Ленина, 10)" style="width: 100%; margin-bottom: 6px; padding: 6px; box-sizing: border-box; font-size: 13px;">
+    <input type="text" id="newCoords" placeholder="Координаты (55.726882, 37.579654)" style="width: 100%; margin-bottom: 6px; padding: 6px; box-sizing: border-box; font-size: 13px;">
+    <input type="number" id="newWeight" placeholder="Вес (кг)" style="width: 100%; margin-bottom: 8px; padding: 6px; box-sizing: border-box; font-size: 13px;">
+    <button id="addNewPointBtn" style="background: #2196F3; color: white; border: none; padding: 8px; width: 100%; cursor: pointer; border-radius: 4px; font-size: 13px; font-weight: bold;">Добавить на карту</button>
+</div>
+</body>
+</html>

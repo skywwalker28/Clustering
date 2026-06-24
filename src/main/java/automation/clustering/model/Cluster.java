@@ -1,6 +1,5 @@
-package automation.clustering.test;
+package automation.clustering.model;
 
-import automation.clustering.model.DeliveryPoint;
 import lombok.Data;
 import java.util.*;
 

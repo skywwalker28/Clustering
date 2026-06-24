@@ -1,39 +1,33 @@
-package automation.clustering.test;
+package automation.clustering.algorithm;
 
+import automation.clustering.model.Cluster;
 import automation.clustering.model.DeliveryPoint;
 
 import java.util.List;
 
 public class BalanceClusters {
-    static KMeansAlgorithm algorithm = new KMeansAlgorithm();
 
     public static boolean balanceOverflowClusters(List<Cluster> clusters, Cluster curCluster) {
-        System.out.println("BALANCE OVERFLOW CLUSTERS");
+        System.out.println("\nBALANCE OVERFLOW CLUSTERS");
         double minDiff = Double.MAX_VALUE;
         Cluster clusterAddPoint = null;
         DeliveryPoint nearestPoint = null;
 
         for (DeliveryPoint point : curCluster.getPoints()) {
-
-            double ownDistance = GeoDistance.getDistanceMeters(
+            double ownDistance = GeoDistance.getDistance(
                     point.getLat(), point.getLon(), curCluster.getCentroidLat(), curCluster.getCentroidLon()
             );
 
             for (Cluster cluster : clusters) {
-                if (cluster == curCluster || cluster.getGivenPoints().contains(point)) {
-                    if (cluster.getGivenPoints().contains(point)) {
-                        System.out.println("Cluster not give point " + point.getAddress());
-                    }
+                if (cluster == curCluster || cluster.getGivenPoints().contains(point)) continue;
 
-                    continue;
-                }
 
-               double alienDistance = GeoDistance.getDistanceMeters(
+               double alienDistance = GeoDistance.getDistance(
                        point.getLat(), point.getLon(), cluster.getCentroidLat(), cluster.getCentroidLon()
                );
 
-
                double diff = alienDistance - ownDistance;
+
                if (diff < minDiff) {
                    minDiff = diff;
                    clusterAddPoint = cluster;
@@ -45,7 +39,13 @@ public class BalanceClusters {
 
         if (clusterAddPoint != null) {
             curCluster.removePoint(nearestPoint);
+            curCluster.getGivenPoints().add(nearestPoint);
+
             clusterAddPoint.addPoint(nearestPoint);
+
+            System.out.println("______Update______" +
+                    "\nCluster " + curCluster.getId() + " remove point " + nearestPoint.getAddress());
+            System.out.println("Cluster " + clusterAddPoint.getId() + " add point " + nearestPoint.getAddress());
 
             curCluster.recalculateCentroid();
             clusterAddPoint.recalculateCentroid();
