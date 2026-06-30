@@ -32,7 +32,7 @@ public class RouteOptimizationService {
     public void optimizeAndDisplayRoutes() {
 
         Map<Integer, List<DeliveryPoint>> driverAndPoints;
-        Map<Integer, List<double[]>> driverAndCoordinate = new HashMap<>();
+
 
         System.out.println("\n");
 
@@ -40,36 +40,13 @@ public class RouteOptimizationService {
             System.out.println("Excel file: " + filepath);
             List<DeliveryPoint> points = readDeliveryPointsFromExcel(filepath);
             List<double[]> coordinates = getCoordinates(points);
+            int[] totalPoints = new int[1];
+            driverAndPoints = KMeansAlgorithm.cluster(points, 10, 3, totalPoints);
 
-            Map<CoordinateWrapper, DeliveryPoint> coordinateAndPoint = getRelationship(coordinates, points);
 
-/*            String requestJson = buildORSOptimizationJson(coordinates, points);
-            String response = sendORSRequest(requestJson);
-
-            if (response == null) {
-                exportHtmlMap(points, "map.html");
-                return;
-            }
-
-            parseORSResponse(response, coordinateAndPoint, driverAndPoints, driverAndCoordinate);*/
-            driverAndPoints = KMeansAlgorithm.cluster(points, 3, 10);
             exportHtmlMap(driverAndPoints, "map.html");
-
-            int totalPoints = 0;
-            for (Map.Entry<Integer, List<DeliveryPoint>> entry : driverAndPoints.entrySet()) {
-                int driverNum = entry.getKey() + 1;
-                List<DeliveryPoint> getAddresses = entry.getValue();
-
-                System.out.println("\nВоидетль " + driverNum + ". Всего точек: " + getAddresses.size());
-
-                for (DeliveryPoint current : getAddresses) {
-                    totalPoints++;
-                    String point = current.getAddress();
-                    System.out.println(current.getNumber() + ". " + cleanAddress(point));
-                }
-            }
-
-            System.out.println("\nВсего распределенно точек: " + totalPoints + "/" + coordinates.size());
+            System.out.println("\nВсего распределенно точек: " + totalPoints[0] + "/" + coordinates.size());
+            System.out.println("Распределено на " + driverAndPoints.size() + " водителей");
 
         } catch (Exception e) {
             System.err.println("Error in RouteOptimizationService: " + e.getMessage());

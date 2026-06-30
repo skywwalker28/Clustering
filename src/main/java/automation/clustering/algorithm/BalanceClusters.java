@@ -14,7 +14,7 @@ public class BalanceClusters {
         DeliveryPoint nearestPoint = null;
 
         for (DeliveryPoint point : curCluster.getPoints()) {
-            double ownDistance = GeoDistance.getDistance(
+            double ownDistance = DistanceHelper.getDistance(
                     point.getLat(), point.getLon(), curCluster.getCentroidLat(), curCluster.getCentroidLon()
             );
 
@@ -22,7 +22,7 @@ public class BalanceClusters {
                 if (cluster == curCluster || cluster.getGivenPoints().contains(point)) continue;
 
 
-               double alienDistance = GeoDistance.getDistance(
+               double alienDistance = DistanceHelper.getDistance(
                        point.getLat(), point.getLon(), cluster.getCentroidLat(), cluster.getCentroidLon()
                );
 
@@ -46,9 +46,6 @@ public class BalanceClusters {
             System.out.println("______Update______" +
                     "\nCluster " + curCluster.getId() + " remove point " + nearestPoint.getAddress());
             System.out.println("Cluster " + clusterAddPoint.getId() + " add point " + nearestPoint.getAddress());
-
-            curCluster.recalculateCentroid();
-            clusterAddPoint.recalculateCentroid();
 
             return true;
         }

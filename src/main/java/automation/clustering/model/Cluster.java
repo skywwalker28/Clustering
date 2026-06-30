@@ -8,7 +8,7 @@ public class Cluster {
     private int id;
     private double centroidLat;
     private double centroidLon;
-    private final Set<DeliveryPoint> points = new HashSet<>();
+    private Set<DeliveryPoint> points = new HashSet<>();
     private final Set<DeliveryPoint> givenPoints = new HashSet<>();
 
     public Cluster(int id, double startLat, double startLon) {
@@ -17,18 +17,18 @@ public class Cluster {
         centroidLon = startLon;
     }
 
+    public Cluster(int id, Set<DeliveryPoint> points) {
+        this.id = id;
+        this.points = points;
+    }
+
     public void clearPoints() {
         points.clear();
     }
-
     public void addPoint(DeliveryPoint point) {
         points.add(point);
     }
-
-    public void removePoint(DeliveryPoint point) {
-        points.remove(point);
-        givenPoints.add(point);
-    }
+    public void removePoint(DeliveryPoint point) { points.remove(point); }
 
     public void recalculateCentroid() {
         if (points.isEmpty()) return;
