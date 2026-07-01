@@ -2,9 +2,7 @@ package automation.clustering.algorithm;
 
 import automation.clustering.model.Cluster;
 import automation.clustering.model.DeliveryPoint;
-
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class DistanceHelper {
     private static final double EARTH_RADIUS = 6371000.0;
@@ -64,8 +62,26 @@ public class DistanceHelper {
                     if (candidateDistance < bestDistance) {
                         bestDistance = candidateDistance;
                         result = candidate;
-                        System.out.println("Find new traffic: " + result.stream().map(p ->
-                                String.valueOf(p.getNumber())).collect(Collectors.joining(",")));
+                        improved = true;
+                    }
+                }
+            }
+        }
+
+        improved = true;
+        while (improved) {
+            improved = false;
+
+            double bestDistance = getDistanceCluster(result);
+
+            for (int i = 0; i < result.size() - 1; i++) {
+                for (int j = i + 2; j < result.size(); j++) {
+                    List<DeliveryPoint> candidate = getReverse(result, i, j);
+                    double candidateDistance = getDistanceCluster(candidate);
+
+                    if (candidateDistance < bestDistance) {
+                        bestDistance = candidateDistance;
+                        result = candidate;
                         improved = true;
                     }
                 }
@@ -75,10 +91,18 @@ public class DistanceHelper {
         return result;
     }
 
+
     private static List<DeliveryPoint> getSwap(List<DeliveryPoint> route, int start, int end) {
         List<DeliveryPoint> copyRoute = new ArrayList<>(route);
         DeliveryPoint point = copyRoute.remove(end);
         copyRoute.add(start, point);
+
+        return copyRoute;
+    }
+
+    private static List<DeliveryPoint> getReverse(List<DeliveryPoint> route, int start, int end) {
+        List<DeliveryPoint> copyRoute = new ArrayList<>(route);
+        while (start < end) Collections.swap(copyRoute, start++, end--);
 
         return copyRoute;
     }
@@ -96,27 +120,16 @@ public class DistanceHelper {
         return distance;
     }
 
-    public static double calculateTotalDistance(Set<DeliveryPoint> cluster1, Set<DeliveryPoint> cluster2) {
+    public static double calculateTotalTwoClusterIndex(Cluster cluster1, Cluster cluster2) {
+        double indexCluster1 = cluster1.calculateClusteringIndex();
+        double indexCluster2 = cluster2.calculateClusteringIndex();
 
-        List<DeliveryPoint> sortedCluster1 = sortingCluster(cluster1);
-        List<DeliveryPoint> sortedCluster2 = sortingCluster(cluster2);
-
-        double distance1 = getDistanceCluster(sortedCluster1);
-        double distance2 = getDistanceCluster(sortedCluster2);
-
-        return distance1 + distance2;
+        return indexCluster1 + indexCluster2;
     }
 
     public static List<Cluster> initializerCluster(List<DeliveryPoint> points, int drivers) {
         List<Cluster> clusters = new ArrayList<>();
         List<DeliveryPoint> rotated = sortedPointCircle(points);
-        System.out.println("All points circle: " + rotated.stream().map(p ->
-                String.valueOf(p.getNumber())).collect(Collectors.joining(",")));
-
-        System.out.println("\nRotated: " + rotated.stream().map(p ->
-                String.valueOf(p.getNumber())).collect(Collectors.joining(",")));
-        System.out.println();
-
         int sectorSize = (points.size() + drivers - 1) / drivers;
 
         for (int i = 0; i < drivers; i++) {

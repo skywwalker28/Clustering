@@ -1,22 +1,15 @@
 package automation.clustering.main;
 
-import automation.clustering.algorithm.KMeansAlgorithm;
-import automation.clustering.wrapper.CoordinateWrapper;
 import automation.clustering.model.DeliveryPoint;
 import org.springframework.stereotype.Service;
 import java.util.*;
 
 import static automation.clustering.geocoding.ConnectDaData.dotenv;
-import static automation.clustering.ors.BuildORS.buildORSOptimizationJson;
-import static automation.clustering.ors.BuildORS.sendORSRequest;
 import static automation.clustering.path.GetPath.getPathToLatestFile;
 import static automation.clustering.geocoding.GeocodingAddresses.getCoordinates;
-import static automation.clustering.main.HelperOptimization.getRelationship;
-import static automation.clustering.main.HelperOptimization.parseORSResponse;
-import static automation.clustering.main.CleanAddress.cleanAddress;
 import static automation.clustering.map.RouteMapExporter.exportHtmlMap;
-import static automation.clustering.map.RouteMapExporterHandle.exportHtmlMap;
 import static automation.clustering.excel.ExcelReader.readDeliveryPointsFromExcel;
+import static automation.clustering.algorithm.KMeansAlgorithm.cluster;
 
 
 @Service
@@ -41,7 +34,7 @@ public class RouteOptimizationService {
             List<DeliveryPoint> points = readDeliveryPointsFromExcel(filepath);
             List<double[]> coordinates = getCoordinates(points);
             int[] totalPoints = new int[1];
-            driverAndPoints = KMeansAlgorithm.cluster(points, 10, 3, totalPoints);
+            driverAndPoints = cluster(points, 10, 3, totalPoints);
 
 
             exportHtmlMap(driverAndPoints, "map.html");

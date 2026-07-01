@@ -7,45 +7,46 @@ import java.util.List;
 
 public class BalanceClusters {
 
-    public static boolean balanceOverflowClusters(List<Cluster> clusters, Cluster curCluster) {
+    public static boolean balanceOverflowClusters(List<Cluster> clusters, Cluster fromCluster) {
         System.out.println("\nBALANCE OVERFLOW CLUSTERS");
         double minDiff = Double.MAX_VALUE;
-        Cluster clusterAddPoint = null;
+        Cluster toCluster = null;
         DeliveryPoint nearestPoint = null;
 
-        for (DeliveryPoint point : curCluster.getPoints()) {
+        for (DeliveryPoint point : fromCluster.getPoints()) {
             double ownDistance = DistanceHelper.getDistance(
-                    point.getLat(), point.getLon(), curCluster.getCentroidLat(), curCluster.getCentroidLon()
+                    point.getLat(), point.getLon(), fromCluster.getCentroidLat(), fromCluster.getCentroidLon()
             );
 
             for (Cluster cluster : clusters) {
-                if (cluster == curCluster || cluster.getGivenPoints().contains(point)) continue;
+                if (cluster == fromCluster || cluster.getGivenPoints().contains(point)) continue;
 
 
-               double alienDistance = DistanceHelper.getDistance(
-                       point.getLat(), point.getLon(), cluster.getCentroidLat(), cluster.getCentroidLon()
-               );
+                double alienDistance = DistanceHelper.getDistance(
+                        point.getLat(), point.getLon(), cluster.getCentroidLat(), cluster.getCentroidLon()
+                );
 
-               double diff = alienDistance - ownDistance;
+                double diff = alienDistance - ownDistance;
 
-               if (diff < minDiff) {
-                   minDiff = diff;
-                   clusterAddPoint = cluster;
-                   nearestPoint = point;
-               }
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    toCluster = cluster;
+                    nearestPoint = point;
+                }
             }
 
         }
 
-        if (clusterAddPoint != null) {
-            curCluster.removePoint(nearestPoint);
-            curCluster.getGivenPoints().add(nearestPoint);
+        if (toCluster != null) {
+            fromCluster.removePoint(nearestPoint);
+            toCluster.addPoint(nearestPoint);
 
-            clusterAddPoint.addPoint(nearestPoint);
+            fromCluster.recalculateCentroid();
+            toCluster.recalculateCentroid();
 
             System.out.println("______Update______" +
-                    "\nCluster " + curCluster.getId() + " remove point " + nearestPoint.getAddress());
-            System.out.println("Cluster " + clusterAddPoint.getId() + " add point " + nearestPoint.getAddress());
+                    "\nCluster " + fromCluster.getId() + " remove point " + nearestPoint.getNumber());
+            System.out.println("Cluster " + toCluster.getId() + " add point " + nearestPoint.getNumber());
 
             return true;
         }
