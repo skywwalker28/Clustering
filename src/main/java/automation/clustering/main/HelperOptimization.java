@@ -26,7 +26,8 @@ public class HelperOptimization {
 
     public static void parseORSResponse(
             String response, Map<CoordinateWrapper, DeliveryPoint> cp,
-            Map<Integer,List<DeliveryPoint>> dp, Map<Integer, List<double[]>> dc) {
+            Map<Integer,List<DeliveryPoint>> dp, int[] totalPoints
+    ) {
 
         JsonObject root = JsonParser.parseString(response).getAsJsonObject();
         JsonArray routes = root.getAsJsonArray("routes");
@@ -36,7 +37,6 @@ public class HelperOptimization {
             int driverId = route.get("vehicle").getAsInt();
 
             List<DeliveryPoint> points = new ArrayList<>();
-            List<double[]> coordinates = new ArrayList<>();
 
             JsonArray steps = route.getAsJsonArray("steps");
 
@@ -49,12 +49,11 @@ public class HelperOptimization {
                     double[] lat_lon = {location.get(1).getAsDouble(), location.get(0).getAsDouble()};
 
                     points.add(cp.get(new CoordinateWrapper(lat_lon)));
-                    coordinates.add(lat_lon);
                 }
             }
 
+            totalPoints[0] += points.size();
             dp.put(driverId, points);
-            dc.put(driverId, coordinates);
         }
     }
 }

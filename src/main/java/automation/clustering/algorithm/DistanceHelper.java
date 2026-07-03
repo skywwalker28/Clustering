@@ -144,7 +144,6 @@ public class DistanceHelper {
             int count = end - start;
 
             clusters.add(new Cluster(i+1, lat/count, lon/count));
-            System.out.println("For Cluster " + (i + 1) + " centroid: " + lat/count + ", " + lon/count);
         }
 
         return clusters;

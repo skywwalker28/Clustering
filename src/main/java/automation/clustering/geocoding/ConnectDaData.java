@@ -15,8 +15,8 @@ public class ConnectDaData {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
     private static final String url = "https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address";
-    public static final String API_KEY_DaData = dotenv.get("API_DADATA_SECRET_KEY");
-    public static final String SECRET_KEY_DaData = dotenv.get("API_DADATA_KEY");
+    public static final String API_KEY_DaData = dotenv.get("API_DADATA_KEY");
+    public static final String SECRET_KEY_DaData = dotenv.get("API_DADATA_SECRET_KEY");
 
     public static String connectionToDaData(String address) throws IOException, InterruptedException {
         if (API_KEY_DaData == null || SECRET_KEY_DaData == null) {

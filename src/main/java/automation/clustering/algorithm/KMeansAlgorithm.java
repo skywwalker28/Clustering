@@ -6,6 +6,7 @@ import automation.clustering.model.DeliveryPoint;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static automation.clustering.algorithm.BalanceClusters.balanceOverflowClusters;
 import static automation.clustering.algorithm.BalanceTraffic.balanceTraffic;
@@ -25,7 +26,6 @@ public class KMeansAlgorithm {
         Map<Integer, List<DeliveryPoint>> result = new HashMap<>();
 
         for (int i = 0; i < 50; i++) {
-            System.out.println("\n\nIteration " + (i + 1));
             for (Cluster deletePointsCluster : clusters) deletePointsCluster.clearPoints();
 
             for (DeliveryPoint curPoint : points) {
@@ -40,18 +40,11 @@ public class KMeansAlgorithm {
                         minDistance = dist;
                     }
                 }
-                if (minCluster != null) {
-                    minCluster.addPoint(curPoint);
-                    System.out.println("Add point " + curPoint.getNumber() + ", to Cluster " + minCluster.getId());
-                }
+                if (minCluster != null) minCluster.addPoint(curPoint);
             }
 
             boolean isChanged = false;
             for (Cluster curCluster : clusters) {
-
-                System.out.print("[");
-                for (DeliveryPoint point : curCluster.getPoints()) System.out.print(point.getNumber() + ", ");
-                System.out.println("]");
 
                 double oldCentroidLat = curCluster.getCentroidLat();
                 double oldCentroidLon = curCluster.getCentroidLon();
@@ -60,10 +53,7 @@ public class KMeansAlgorithm {
 
                 if (oldCentroidLat != curCluster.getCentroidLat() || oldCentroidLon != curCluster.getCentroidLon()) {
                     isChanged = true;
-                    System.out.println("isChange = true");
-                    System.out.println("new centroid = " + curCluster.getCentroidLat() + ", " + curCluster.getCentroidLon());
-                } else System.out.println("isChange = false");
-                System.out.println("--------------------------------------------------");
+                }
             }
 
 
@@ -82,11 +72,13 @@ public class KMeansAlgorithm {
                 while (balanceTraffic(clusters, maxPoints) && safetyNet < 50) safetyNet++;
 
                 for (Cluster cluster : clusters) {
-                    System.out.print("Cluster " + cluster.getId() + " [ ");
 
                     List<DeliveryPoint> sorted = sortingCluster(cluster.getPoints());
-                    for (DeliveryPoint point : sorted) System.out.print(point.getNumber() + " ");
-                    System.out.println("]");
+                    String output = sorted.stream()
+                            .map(point -> String.valueOf(point.getNumber()))
+                            .collect(Collectors.joining(", "));
+
+                    System.out.println("Cluster " + cluster.getId() + ": [" + output + "]");
 
                     result.put(cluster.getId(), sortingCluster(cluster.getPoints()));
                     allPoints[0] += cluster.getPoints().size();
@@ -95,8 +87,6 @@ public class KMeansAlgorithm {
                 break;
             }
         }
-
-
 
         return result;
     }

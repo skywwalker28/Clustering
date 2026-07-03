@@ -1,4 +1,4 @@
-package automation.clustering.distance;
+package automation.clustering.ors;
 
 import java.util.List;
 

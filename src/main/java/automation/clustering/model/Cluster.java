@@ -4,6 +4,7 @@ import lombok.Data;
 import java.util.*;
 
 import static automation.clustering.algorithm.DistanceHelper.getDistance;
+import static automation.clustering.algorithm.DistanceHelper.sortingCluster;
 
 @Data
 public class Cluster {
@@ -52,43 +53,41 @@ public class Cluster {
     public double calculateClusteringIndex() {
         if (getPoints().isEmpty()) return 0.0;
 
-        double centroidLat = getCentroidLat(), centroidLon = getCentroidLon();
-        double wss = 0.0, varianceLat = 0.0, varianceLon = 0.0, covLatLon = 0.0;
+        double sumDistance = 0.0;
+        double maxLat = -Double.MAX_VALUE, maxLon = -Double.MAX_VALUE;
+        double minLat = Double.MAX_VALUE, minLon = Double.MAX_VALUE;
 
-        int n = getPoints().size();
-        double lonCorrection = Math.cos(Math.toRadians(centroidLat));
+        List<DeliveryPoint> points = sortingCluster(getPoints());
 
-        for (DeliveryPoint point : getPoints()) {
-            double dLat = point.getLat() - centroidLat;
-            double dLon = (point.getLon() - centroidLon) * lonCorrection;
-
-            varianceLat += dLat * dLat;
-            varianceLon += dLon * dLon;
-            covLatLon += dLat * dLon;
-
-            double distance = getDistance(point.getLat(), point.getLon(), centroidLat, centroidLon);
-            wss += distance * distance;
+        double routeLength = 0.0;
+        for (int i = 0; i < points.size()-1; i++) {
+            routeLength += getDistance(points.get(i).getLat(), points.get(i).getLon(),
+                    points.get(i+1).getLat(), points.get(i+1).getLon());
         }
 
-        double a = varianceLat / n, c = varianceLon / n, b = covLatLon / n;
-        double trace = a + c, determinant = a * c - b * b;
 
-        double discriminant = Math.max(0.0, trace * trace - 4.0 * determinant);
-        double sqrtDist = Math.sqrt(discriminant);
+        for (int i = 0; i < points.size(); i++) {
+            DeliveryPoint point1 = points.get(i);
 
-        double lambda1 = (trace + sqrtDist) / 2.0;
-        double lambda2 = (trace - sqrtDist) / 2.0;
+            maxLat = Math.max(maxLat, point1.getLat());
+            maxLon = Math.max(maxLon, point1.getLon());
 
-        lambda2 = Math.max(lambda2, 1e-12);
+            minLat = Math.min(minLat, point1.getLat());
+            minLon = Math.min(minLon, point1.getLon());
 
-        double elongation = Math.sqrt(lambda1 / lambda2);
-        elongation = Math.min(elongation, 10.0);
+            for (int j = i+1; j < points.size(); j++) {
+                DeliveryPoint point2 = points.get(j);
 
-        double totalWssSqKm = wss / 1000000.0;
+                double distance = getDistance(point1.getLat(), point1.getLon(), point2.getLat(), point2.getLon());
+                sumDistance += distance;
 
-        double areaPenalty = totalWssSqKm * totalWssSqKm;
+            }
+        }
 
-        return areaPenalty * Math.sqrt(elongation);
+        double width = maxLon - minLon;
+        double heigh = maxLat - minLat;
+
+
+        return routeLength + sumDistance + 3 * (width + heigh);
     }
-
 }

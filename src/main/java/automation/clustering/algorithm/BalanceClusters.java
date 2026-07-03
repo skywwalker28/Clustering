@@ -8,7 +8,6 @@ import java.util.List;
 public class BalanceClusters {
 
     public static boolean balanceOverflowClusters(List<Cluster> clusters, Cluster fromCluster) {
-        System.out.println("\nBALANCE OVERFLOW CLUSTERS");
         double minDiff = Double.MAX_VALUE;
         Cluster toCluster = null;
         DeliveryPoint nearestPoint = null;
@@ -43,10 +42,6 @@ public class BalanceClusters {
 
             fromCluster.recalculateCentroid();
             toCluster.recalculateCentroid();
-
-            System.out.println("______Update______" +
-                    "\nCluster " + fromCluster.getId() + " remove point " + nearestPoint.getNumber());
-            System.out.println("Cluster " + toCluster.getId() + " add point " + nearestPoint.getNumber());
 
             return true;
         }

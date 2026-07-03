@@ -1,4 +1,4 @@
-package automation.clustering.distance;
+package automation.clustering.ors;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -10,8 +10,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 
-import static automation.clustering.distance.CreateStringBuilder.createJsonBuilder;
-import static automation.clustering.distance.Calculate.calculateApproximateDistance;
+import static automation.clustering.ors.Calculate.calculateApproximateDistance;
 import static automation.clustering.main.RouteOptimizationService.API_KEY;
 
 public class OrsDistance {
@@ -61,5 +60,16 @@ public class OrsDistance {
         result[1] = summary.get("duration").getAsDouble()/60;
 
         return result;
+    }
+
+    public static String createJsonBuilder(List<double[]> points) {
+        StringBuilder result = new StringBuilder("{\"coordinates\":[");
+        for (int i = 0; i < points.size(); i++) {
+            result.append("[").append(points.get(i)[1]).append(",").append(points.get(i)[0]).append("]");
+
+            if (i < points.size() - 1) result.append(",");
+        }
+
+        return result.append("],\"instructions\":\"false\"}").toString();
     }
 }

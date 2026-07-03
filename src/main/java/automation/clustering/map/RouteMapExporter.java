@@ -146,10 +146,10 @@ public class RouteMapExporter {
                 writer.write(template);
             }
 
-            System.out.println("🗺 HTML map created: " + fileName);
+            System.out.println("Карта создана, название: " + fileName);
 
         } catch (Exception e) {
-            System.err.println("Error creating map: " + e.getMessage());
+            System.err.println("Ошибка в создании карты: " + e.getMessage());
         }
     }
 }
