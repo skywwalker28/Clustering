@@ -22,13 +22,7 @@ public class RouteMapExporter {
     private static final int MANEUVER_TIME = 10;
     private static final double DISTANCE_COEFFICIENT = 1.3;
 
-    private static final String[][] DRIVER_INFO_LIST = {
-            {"Ниссан В771АР 550", "Харламов Станислав Андреевич", "8 (901) 761-5771", "ИП Лихолетова Оксана", "7500"},
-            {"Sollers Argo В601НТ977", "Ординарцев Владимир Александрович", "8(977)315-6815", "ООО Имтэк", "0.00"},
-            {"Sollers Argo Н689НЕ977", "Оганесян Давид Миранович. Паспорт 4622 620024. Выдан ГУ МВД России по Моск области, " +
-                    "02.07.2022", "8(917)579-0990", "Имтэк", "0.00"},
-            {"-", "-", "-", "-", "-", "0.00"}
-    };
+    private static final String[][] DRIVER_INFO_LIST = {...};
 
     private static String escapeJsString(String s) {
         if (s == null) return "";
