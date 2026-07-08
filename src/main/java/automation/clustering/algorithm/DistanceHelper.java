@@ -5,8 +5,6 @@ import automation.clustering.model.DeliveryPoint;
 import java.util.*;
 
 public class DistanceHelper {
-    private static final double EARTH_RADIUS = 6371000.0;
-
     public static double getDistance(double lat1, double lon1, double lat2, double lon2) {
         double dLat = Math.toRadians(lat1 - lat2);
         double dLon = Math.toRadians(lon1 - lon2);
@@ -16,7 +14,7 @@ public class DistanceHelper {
                 Math.sin(dLon/2) * Math.sin(dLon/2);
 
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return EARTH_RADIUS * c;
+        return 6371000.0 * c;
     }
 
     public static List<DeliveryPoint> sortingCluster(Set<DeliveryPoint> points) {

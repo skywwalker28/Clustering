@@ -11,7 +11,6 @@ public class BalanceClusters {
         double minDiff = Double.MAX_VALUE;
         Cluster toCluster = null;
         DeliveryPoint nearestPoint = null;
-
         for (DeliveryPoint point : fromCluster.getPoints()) {
             double ownDistance = DistanceHelper.getDistance(
                     point.getLat(), point.getLon(), fromCluster.getCentroidLat(), fromCluster.getCentroidLon()

@@ -12,6 +12,7 @@ import static automation.clustering.algorithm.BalanceClusters.balanceOverflowClu
 import static automation.clustering.algorithm.BalanceTraffic.balanceTraffic;
 import static automation.clustering.algorithm.DistanceHelper.getDistance;
 import static automation.clustering.algorithm.DistanceHelper.sortingCluster;
+import static automation.clustering.algorithm.DistanceHelper.initializerCluster;
 
 public class KMeansAlgorithm {
     public static Map<Integer, List<DeliveryPoint>> cluster(List<DeliveryPoint> points,
@@ -22,7 +23,7 @@ public class KMeansAlgorithm {
                     ". Needs minimum " + (points.size() + drivers - 1) / drivers + " points per vehicle");
         }
 
-        List<Cluster> clusters = DistanceHelper.initializerCluster(points, drivers);
+        List<Cluster> clusters = initializerCluster(points, drivers);
         Map<Integer, List<DeliveryPoint>> result = new HashMap<>();
 
         for (int i = 0; i < 50; i++) {
@@ -79,7 +80,6 @@ public class KMeansAlgorithm {
                             .collect(Collectors.joining(", "));
 
                     System.out.println("Cluster " + cluster.getId() + ": [" + output + "]");
-
                     result.put(cluster.getId(), sortingCluster(cluster.getPoints()));
                 }
 
