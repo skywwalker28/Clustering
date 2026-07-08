@@ -110,7 +110,6 @@ public class CreateFinalRegistry {
                             cellWeight.setCellValue(point.getWeightKg());
                         }
 
-                        // --- ИСПРАВЛЕНИЕ ФОРМУЛЫ ---
                         Cell cellG = newRow.getCell(6);
                         if (cellG == null) cellG = newRow.createCell(6);
 
@@ -171,11 +170,9 @@ public class CreateFinalRegistry {
                 XSSFCellStyle sourceStyle = (XSSFCellStyle) sourceCell.getCellStyle();
                 XSSFCellStyle newStyle = targetWorkbook.createCellStyle();
 
-                // Базовое копирование структуры стиля
                 newStyle.cloneStyleFrom(sourceStyle);
                 newStyle.setDataFormat(sourceStyle.getDataFormat());
 
-                // Применяем специфичные форматы данных ТОЛЬКО к строкам с заказами (не к шапке)
                 if (orderNumber != -1) {
                     if (i == 0) {
                         CreationHelper createHelper = targetWorkbook.getCreationHelper();
@@ -222,7 +219,6 @@ public class CreateFinalRegistry {
 
                 newStyle.setFont(newFont);
 
-                // Кастомная закраска ID заказа цветом водителя (только для данных)
                 if (i == 1 && orderNumber != -1 && driverColorHex != null) {
                     DataFormat format = targetWorkbook.createDataFormat();
                     newStyle.setDataFormat(format.getFormat("0"));
@@ -243,7 +239,6 @@ public class CreateFinalRegistry {
             }
         }
 
-        // Заполнение данных водителя (только для строк данных)
         if (currentDriver != null && orderNumber != -1) {
             Cell vehicleTC = target.getCell(10);
             if (vehicleTC == null) vehicleTC = target.createCell(10);

@@ -3,12 +3,15 @@ package automation.clustering.map;
 import automation.clustering.model.DeliveryPoint;
 
 import java.io.FileWriter;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
-import static automation.clustering.main.CleanAddress.cleanAddress;
+import static automation.clustering.geocoding.CleanAddress.cleaningAddress;
 
 public class RouteMapExporter {
 
@@ -43,7 +46,10 @@ public class RouteMapExporter {
     }
 
     private static String loadTemplate() throws Exception {
-        return Files.readString(Paths.get("src/main/resources/map-template.html"));
+        try (InputStream is = RouteMapExporter.class.getResourceAsStream("/map-template.html")){
+            if (is == null) throw new Exception("Файл map-template.html не найден внутри Jar файла");
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     public static void exportHtmlMap(
@@ -53,7 +59,6 @@ public class RouteMapExporter {
         try {
             String template = loadTemplate();
 
-            // Заменяем bmm координаты
             String bmmCoords = "[" + formatDouble(BMM_COORDS[0]) + ", " + formatDouble(BMM_COORDS[1]) + "]";
             template = template.replace("__BMM_COORDS__", bmmCoords);
             template = template.replace("__DISTANCE_COEFFICIENT__", String.valueOf(DISTANCE_COEFFICIENT));
@@ -121,7 +126,7 @@ public class RouteMapExporter {
                 driversData.append("points: [");
 
                 for (DeliveryPoint point : route) {
-                    String address = cleanAddress(point.getAddress());
+                    String address = cleaningAddress(point.getAddress());
                     address = escapeJsString(address);
                     driversData.append("{")
                             .append("coords: [").append(formatDouble(point.getLon())).append(", ")
@@ -145,6 +150,9 @@ public class RouteMapExporter {
             try (FileWriter writer = new FileWriter(fileName)) {
                 writer.write(template);
             }
+
+            Path path = Paths.get(fileName);
+            Files.writeString(path, template, StandardCharsets.UTF_8);
 
             System.out.println("Карта создана, название: " + fileName);
 

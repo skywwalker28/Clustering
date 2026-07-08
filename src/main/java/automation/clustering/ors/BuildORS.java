@@ -11,13 +11,14 @@ import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.List;
 
-import static automation.clustering.main.RouteOptimizationService.API_KEY;
+import static automation.clustering.main.RouteOptimizationStart.dotenv;
 import static automation.clustering.ors.CreateDrivers.getStringBuilder;
 import static automation.clustering.ors.CreateDrivers.getStringBuilderBMM;
 
 
 public class BuildORS {
     static final int MAX_POINTS_PER_DRIVER = 8;
+    public static final String API_KEY = dotenv.get("API_ORS");
 
     @Setter
     private static HttpClient httpClient = HttpClient.newHttpClient();
@@ -29,7 +30,7 @@ public class BuildORS {
         System.out.println("neededVehicle: " + neededVehicles);
 
         StringBuilder jobs = getStringBuilder(coordinates, weights);
-        StringBuilder vehicles = getStringBuilderBMM(neededVehicles);
+        StringBuilder vehicles = getStringBuilderBMM();
 
         return """
         {

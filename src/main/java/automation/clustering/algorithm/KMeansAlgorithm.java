@@ -15,7 +15,7 @@ import static automation.clustering.algorithm.DistanceHelper.sortingCluster;
 
 public class KMeansAlgorithm {
     public static Map<Integer, List<DeliveryPoint>> cluster(List<DeliveryPoint> points,
-                                                            int maxPoints, int drivers, int[] allPoints) {
+                                                            int maxPoints, int drivers) {
         if (drivers * maxPoints < points.size()) {
             throw new RuntimeException("ERROR, " + drivers + " drivers can't take " + maxPoints +
                     " points per vehicle, because all points is " + points.size() +
@@ -81,7 +81,6 @@ public class KMeansAlgorithm {
                     System.out.println("Cluster " + cluster.getId() + ": [" + output + "]");
 
                     result.put(cluster.getId(), sortingCluster(cluster.getPoints()));
-                    allPoints[0] += cluster.getPoints().size();
                 }
 
                 break;

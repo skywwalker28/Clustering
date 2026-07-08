@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ExcelReader {
-    public static List<DeliveryPoint> readDeliveryPointsFromExcel(String filePath) throws Exception {
+    public static List<DeliveryPoint> readDeliveryPointsFromExcel(String filePath, int[] allPoints) throws Exception {
         ZipSecureFile.setMinInflateRatio(0.001);
         List<DeliveryPoint> points = new ArrayList<>();
 
@@ -44,6 +44,7 @@ public class ExcelReader {
                 int number = (int) numberCell.getNumericCellValue();
 
                 points.add(new DeliveryPoint(rawAddress, weight, number));
+                allPoints[0]++;
             }
         }
 

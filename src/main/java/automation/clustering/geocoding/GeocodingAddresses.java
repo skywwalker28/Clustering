@@ -6,37 +6,53 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static automation.clustering.addresses.BaseCoordinates.getBaseCoordinate;
 import static automation.clustering.geocoding.ConnectDaData.connectionToDaData;
 import static automation.clustering.geocoding.GetLatLon.parseJsonAndGetLatLon;
-import static automation.clustering.addresses.BaseCoordinates.getBaseCoordinate;
-import static automation.clustering.main.CleanAddress.cleanAddress;
+import static automation.clustering.geocoding.CleanAddress.cleaningAddress;
 
 public class GeocodingAddresses {
 
-    public static List<double[]> getCoordinates(List<DeliveryPoint> allAddresses) throws Exception {
+    public static List<double[]> getCoordinates(List<DeliveryPoint> allAddresses) {
         List<double[]> allCoordinates = new ArrayList<>();
 
         for (DeliveryPoint current : allAddresses) {
-            System.out.println(
-                    "Адрес: " + "\u001B[32m(" + current.getNumber() + ") " + current.getAddress() + "\u001B[0m");
+            System.out.println("_____ Адрес: (" + current.getNumber() + ") " + current.getAddress() + " ______");
 
             double[] coordinate = getBaseCoordinate(current.getAddress());
             if (coordinate == null) {
-                System.out.println("Адрес не найден! Надо геокодировать...");
-                String address = current.getAddress();
-                coordinate = parseJsonAndGetLatLon(connectionToDaData(cleanAddress(address)));
+                try {
+                    System.out.println("Попытка геокодирования №1");
+                    coordinate = parseJsonAndGetLatLon(connectionToDaData(current.getAddress()));
+                } catch (Exception e) {
+                    System.out.println("не найден...");
+                }
             }
-            allCoordinates.add(coordinate);
+
+            if (coordinate == null ) {
+                try {
+                    System.out.println("Попытка геокодирования №2\n");
+                    String cleanedAddress = cleaningAddress(current.getAddress());
+                    coordinate = parseJsonAndGetLatLon(connectionToDaData(cleanedAddress));
+                } catch (Exception e) {
+                    System.out.println("не найден...");
+                }
+            }
+
 
             if (coordinate != null) {
+                System.out.println("Адресс найден: " + Arrays.toString(coordinate) + "\n");
                 current.setLat(coordinate[0]);
                 current.setLon(coordinate[1]);
+                allCoordinates.add(coordinate);
+            } else {
+                System.err.println("\u001B[31mТОЧКА НЕ НАЙДЕНА: (" + current.getNumber()
+                        + ") " + current.getAddress() + "\u001B[0m");
             }
-
-            if (coordinate != null) System.out.println("координаты: " + Arrays.toString(coordinate) + "\n");
-            else System.err.println("Не найден адресс" + "\n");
         }
 
+        System.out.println();
+        allAddresses.removeIf(point -> point.getLon() == 0.0);
         return allCoordinates;
     }
 

@@ -25,8 +25,7 @@ public class HelperOptimization {
     }
 
     public static void parseORSResponse(
-            String response, Map<CoordinateWrapper, DeliveryPoint> cp,
-            Map<Integer,List<DeliveryPoint>> dp, int[] totalPoints
+            String response, Map<CoordinateWrapper, DeliveryPoint> cp, Map<Integer,List<DeliveryPoint>> dp
     ) {
 
         JsonObject root = JsonParser.parseString(response).getAsJsonObject();
@@ -52,7 +51,6 @@ public class HelperOptimization {
                 }
             }
 
-            totalPoints[0] += points.size();
             dp.put(driverId, points);
         }
     }

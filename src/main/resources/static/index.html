@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Загрузка файла для кластеризации</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #fae0e0; margin: 0;
+
+        }
+        .upload-container {
+            background: rgba(255, 240, 240, 0.4);
+            padding: 20px;
+            border-radius: 40px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            text-align: center;
+            width: 600px;
+            box-sizing: border-box;
+        }
+
+        h2 {
+            mergin-top: 0;
+            font-size: 25px;
+            mergin-bottom: 30px;
+        }
+
+        input[type="file"],
+        select {
+            -webkit-appearance: none;
+            margin: 10px 0 25px 0;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 16px;
+            font-size: 22px;
+            border-radius: 30px;
+            border: 1px solid #ccc;
+            background-color: white;
+            cursor: pointer;
+        }
+
+        input[type="number"] {
+            margin: 10px 0 20px 0;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 8px; }
+
+        label {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            display: block;
+            text-align: left;
+            mergin-buttom: 8px;
+        }
+
+        button {
+            background: rgba(0, 0, 0, 0.77);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            width: 100%;
+            pedding: 15px 20px;
+        }
+
+        button:hover {
+            background: rgba(0, 0, 0, 0.61);
+        }
+
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #loader {
+            display: none;
+            margin-top: 15px;
+            color: #666;
+            font-size: 14px;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="upload-container">
+    <h2 style="margin-top: 0; font-size: 40px;">Расчет маршрутов</h2>
+
+    <label for="fileInput">Excel-файл реестра:</label>
+    <input type="file" id="fileInput" accept=".xlsx, .xls">
+
+    <label for="driverCount">Количество водителей:</label>
+    <select id="driverCount">
+        <option value="3">3</option>
+        <option value="2">2</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="1">1</option>
+    </select>
+
+    <label for="maxPoints">Макс. точек на водителя:</label>
+    <select id="maxPoints">
+        <option value="10">10</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+        <option value="11">11</option>
+        <option value="12">12</option>
+        <option value="13">13</option>
+        <option value="14">14</option>
+        <option value="15">15</option>
+        <option value="16">16</option>
+        <option value="17">17</option>
+        <option value="18">18</option>
+        <option value="19">19</option>
+        <option value="20">20</option>
+    </select>
+
+    <button id="uploadBtn" onclick="uploadFile()">Запустить кластеризацию</button>
+
+    <div id="loader">⚙️ Идет расчет маршрутов, пожалуйста, подождите...</div>
+</div>
+
+<script>
+    function uploadFile() {
+        const fileInput = document.getElementById('fileInput');
+        const driverCount = document.getElementById('driverCount').value;
+        const maxPoints = document.getElementById('maxPoints').value;
+
+        if (!fileInput.files.length) {
+            alert('Сначала выберите файл!');
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const formData = new FormData();
+
+        formData.append('file', file);
+        formData.append('driverCount', driverCount);
+        formData.append('maxPoints', maxPoints);
+
+        const btn = document.getElementById('uploadBtn');
+        const loader = document.getElementById('loader');
+
+        btn.disabled = true;
+        loader.style.display = 'block';
+
+        fetch('/upload-excel', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => {
+                if (!response.ok) throw new Error('Ошибка на сервере при расчете');
+                return response.text();
+            })
+            .then(mapUrl => {
+                window.location.href = mapUrl;
+            })
+            .catch(error => {
+                console.error(error);
+                alert(error.message);
+                btn.disabled = false;
+                loader.style.display = 'none';
+            });
+    }
+</script>
+</body>
+</html>

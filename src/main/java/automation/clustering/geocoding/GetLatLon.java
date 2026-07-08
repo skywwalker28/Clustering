@@ -22,7 +22,6 @@ public class GetLatLon {
             JsonObject data = firstSuggestions.getAsJsonObject("data");
             int currentGeo = data.get("qc_geo").getAsInt();
 
-
             if (!data.get("geo_lat").isJsonNull() && !data.get("geo_lon").isJsonNull()) {
                 if (currentGeo < bestGeo) {
                     bestGeo = currentGeo;
